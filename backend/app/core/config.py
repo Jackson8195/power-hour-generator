@@ -1,0 +1,48 @@
+"""Application configuration loaded from environment variables."""
+
+from pathlib import Path
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # API Keys
+    youtube_api_key: str = ""
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+
+    # Paths
+    media_dir: Path = Path("./media")
+    render_dir: Path = Path("./static/renders")
+    database_url: str = "sqlite+aiosqlite:///./power_hour.db"
+
+    # Server
+    backend_port: int = 8000
+    frontend_port: int = 5173
+    cors_origins: str = "http://localhost:5173"
+
+    # FFmpeg
+    ffmpeg_path: str = "ffmpeg"
+
+    # Download settings
+    max_concurrent_downloads: int = 3
+    default_video_quality: int = 720
+
+    # Power Hour defaults
+    clip_duration: int = 60  # seconds per clip
+    total_clips: int = 60   # clips per power hour
+    transition_duration: float = 1.5  # seconds for transition
+    countdown_start: int = 55  # show countdown at this second
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+    }
+
+    def ensure_dirs(self):
+        """Create media and render directories if they don't exist."""
+        self.media_dir.mkdir(parents=True, exist_ok=True)
+        self.render_dir.mkdir(parents=True, exist_ok=True)
+
+
+settings = Settings()
+settings.ensure_dirs()

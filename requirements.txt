@@ -1,0 +1,27 @@
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+websockets==12.0
+
+# Database
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+
+# YouTube/Video
+yt-dlp==2024.10.7
+
+# Audio analysis
+librosa==0.10.2
+soundfile==0.12.1
+numpy==1.26.4
+
+# Casting
+pychromecast==14.0.1
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.9.0
+pydantic-settings==2.5.2
+httpx==0.27.2
+Pillow==10.4.0
