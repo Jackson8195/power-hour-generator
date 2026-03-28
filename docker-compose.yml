@@ -6,11 +6,13 @@ services:
     working_dir: /app/backend
     env_file:
       - backend/.env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:///./data/power_hour.db
     ports:
       - "8000:8000"
     volumes:
       - ./backend/media:/app/backend/media
-      - ./backend/power_hour.db:/app/backend/power_hour.db
+      - ./backend/data:/app/backend/data
       - ./backend/.env:/app/backend/.env:ro
     restart: unless-stopped
 

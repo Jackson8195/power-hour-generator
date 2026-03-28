@@ -79,8 +79,9 @@ Then open **http://localhost:5173**.
 
 Notes:
 - Docker keeps the app local on the same machine.
-- Project data persists in `backend/power_hour.db`.
+- Project data persists in `backend/data/power_hour.db`.
 - Media files persist in `backend/media`.
+- The Docker setup uses a persistent data directory instead of a single-file SQLite mount, so the database can be created safely on first run.
 - Chromecast/network discovery may not behave reliably from Docker on macOS.
   Browser playback and system-level AirPlay are the safer fallback.
 
@@ -198,6 +199,10 @@ Once running, visit **http://localhost:8000/docs** for the interactive Swagger U
 - Final committed trimmed clips are stored in `backend/media/clips`
 - Analysis sidecars are stored in `backend/media/analysis`
 - Final renders are stored in `backend/media/renders`
+
+For Docker:
+- Project data persists in `backend/data/power_hour.db`
+- Media files persist in `backend/media`
 
 ## License
 
