@@ -384,6 +384,20 @@ export default function ProjectPage() {
             </button>
           </form>
 
+          {searchResults.length > 0 && (
+            <div className="mb-6 space-y-2">
+              {searchResults.map((result) => (
+                <SearchResultCard
+                  key={result.youtube_id}
+                  result={result}
+                  alreadyAdded={project.clips.some((clip) => clip.youtube_id === result.youtube_id)}
+                  onAdd={() => handleAddClip(result)}
+                  badgeLabel={result.match_score > 0 ? `Score ${result.match_score.toFixed(1)}` : ""}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -417,18 +431,6 @@ export default function ProjectPage() {
                 Add a few songs and this section will start surfacing more picks from the same artists.
               </div>
             )}
-          </div>
-
-          <div className="space-y-2">
-            {searchResults.map((result) => (
-              <SearchResultCard
-                key={result.youtube_id}
-                result={result}
-                alreadyAdded={project.clips.some((clip) => clip.youtube_id === result.youtube_id)}
-                onAdd={() => handleAddClip(result)}
-                badgeLabel={result.match_score > 0 ? `Score ${result.match_score.toFixed(1)}` : ""}
-              />
-            ))}
           </div>
         </div>
       )}
