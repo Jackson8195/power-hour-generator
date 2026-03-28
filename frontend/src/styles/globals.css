@@ -182,6 +182,141 @@
   .card {
     @apply rounded-xl border border-zinc-800 bg-zinc-900 p-4;
   }
+
+  .retro-shell {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(26, 255, 228, 0.14);
+    background:
+      radial-gradient(circle at top left, rgba(255, 43, 157, 0.14), transparent 32%),
+      radial-gradient(circle at top right, rgba(26, 255, 228, 0.08), transparent 30%),
+      linear-gradient(180deg, rgba(8, 19, 26, 0.96) 0%, rgba(5, 10, 16, 0.98) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      0 18px 50px rgba(0, 0, 0, 0.45);
+  }
+
+  .retro-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent, rgba(26, 255, 228, 0.05), transparent),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 3px,
+        rgba(255, 255, 255, 0.018) 3px,
+        rgba(255, 255, 255, 0.018) 4px
+      );
+    opacity: 0.75;
+  }
+
+  .retro-panel {
+    position: relative;
+    border: 1px solid rgba(26, 255, 228, 0.16);
+    background:
+      linear-gradient(180deg, rgba(10, 30, 38, 0.94) 0%, rgba(6, 16, 23, 0.96) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+      0 14px 32px rgba(0, 0, 0, 0.32);
+  }
+
+  .retro-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%);
+  }
+
+  .retro-button-primary {
+    border: 1px solid rgba(255, 43, 157, 0.42);
+    background:
+      linear-gradient(180deg, rgba(72, 8, 40, 0.95), rgba(36, 5, 21, 0.98));
+    color: #ff77c2;
+    box-shadow:
+      inset 0 0 16px rgba(255, 43, 157, 0.08),
+      0 0 20px rgba(255, 43, 157, 0.12);
+  }
+
+  .retro-button-primary:hover {
+    color: #ffd7eb;
+    border-color: rgba(255, 119, 194, 0.62);
+    box-shadow:
+      inset 0 0 20px rgba(255, 43, 157, 0.12),
+      0 0 26px rgba(255, 43, 157, 0.18);
+  }
+
+  .retro-button-secondary {
+    border: 1px solid rgba(26, 255, 228, 0.22);
+    background: linear-gradient(180deg, rgba(11, 34, 40, 0.92), rgba(7, 19, 24, 0.98));
+    color: #91fff2;
+  }
+
+  .retro-button-secondary:hover {
+    color: #defffb;
+    border-color: rgba(26, 255, 228, 0.4);
+    box-shadow: 0 0 22px rgba(26, 255, 228, 0.12);
+  }
+
+  .retro-input {
+    border: 1px solid rgba(26, 255, 228, 0.18);
+    background: rgba(5, 16, 22, 0.92);
+    color: #dcfdf9;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+
+  .retro-input::placeholder {
+    color: rgba(145, 255, 242, 0.35);
+  }
+
+  .retro-input:focus {
+    border-color: rgba(255, 43, 157, 0.5);
+    box-shadow:
+      0 0 0 1px rgba(255, 43, 157, 0.4),
+      0 0 18px rgba(255, 43, 157, 0.14);
+    outline: none;
+  }
+
+  .retro-project-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(26, 255, 228, 0.14);
+    background:
+      radial-gradient(circle at top right, rgba(255, 43, 157, 0.1), transparent 28%),
+      linear-gradient(180deg, rgba(9, 26, 33, 0.94), rgba(5, 14, 20, 0.98));
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+      0 12px 26px rgba(0, 0, 0, 0.26);
+  }
+
+  .retro-project-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 24%);
+  }
+
+  .retro-project-card:hover {
+    border-color: rgba(255, 43, 157, 0.3);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      0 18px 34px rgba(0, 0, 0, 0.34),
+      0 0 26px rgba(255, 43, 157, 0.08);
+  }
+
+  .retro-progress {
+    background: rgba(8, 20, 28, 0.95);
+    border: 1px solid rgba(26, 255, 228, 0.08);
+  }
+
+  .retro-progress__bar {
+    background: linear-gradient(90deg, #ff2b9d 0%, #ff8d4d 48%, #1affe4 100%);
+    box-shadow: 0 0 18px rgba(255, 43, 157, 0.18);
+  }
 }
 
 @layer utilities {

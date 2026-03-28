@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { Project } from "../utils/types";
 import { listProjects } from "../utils/api";
 import clsx from "clsx";
+import CrtStaticText from "../components/CrtStaticText";
 
 const ITEMS_PER_PAGE = 4;
 
@@ -58,32 +59,47 @@ export default function MixtapeBinderPage() {
       <header className="relative z-10 flex items-center gap-6 px-8 pt-8">
         <button
           onClick={() => navigate("/")}
-          className="font-retro text-xl tracking-widest text-zinc-500 transition-colors hover:text-zinc-200"
+          className="crt-action font-retro text-xl tracking-widest text-zinc-500 transition-colors hover:text-zinc-200"
         >
-          ◀ BACK
+          <span className="crt-action__label" data-text="◀ BACK">
+            ◀ BACK
+          </span>
         </button>
-        <h1 className="font-retro text-3xl tracking-widest text-zinc-200 sm:text-4xl">
-          SELECT YOUR MIXTAPE
-        </h1>
+        <CrtStaticText
+          as="h1"
+          text="SELECT YOUR MIXTAPE"
+          textClassName="font-retro text-3xl tracking-widest text-zinc-200 sm:text-4xl"
+        />
       </header>
 
       {/* Main content */}
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
         {loading ? (
-          <p className="animate-pulse font-retro text-2xl tracking-widest text-zinc-500">
-            LOADING...
-          </p>
+          <CrtStaticText
+            as="p"
+            text="LOADING..."
+            textClassName="animate-pulse font-retro text-2xl tracking-[0.2em] text-[#91fff2]/70"
+          />
         ) : projects.length === 0 ? (
           <div className="text-center">
-            <p className="font-retro text-3xl tracking-widest text-zinc-500">NO MIXTAPES FOUND</p>
-            <p className="mt-3 font-retro text-lg tracking-widest text-zinc-700">
-              CREATE ONE TO GET STARTED
-            </p>
+            <CrtStaticText
+              as="p"
+              text="NO MIXTAPES FOUND"
+              textClassName="font-retro text-3xl tracking-widest text-zinc-500"
+            />
+            <CrtStaticText
+              as="p"
+              text="CREATE ONE TO GET STARTED"
+              className="mt-3"
+              textClassName="font-retro text-lg tracking-widest text-zinc-700"
+            />
             <button
               onClick={() => navigate("/create")}
-              className="mt-8 font-retro text-xl tracking-widest text-brand-400 transition-colors hover:text-brand-300"
+              className="crt-action mt-8 font-retro text-xl tracking-widest text-brand-400 transition-colors hover:text-brand-300"
             >
-              ▶ CREATE NEW
+              <span className="crt-action__label" data-text="▶ CREATE NEW">
+                ▶ CREATE NEW
+              </span>
             </button>
           </div>
         ) : (
@@ -140,26 +156,32 @@ export default function MixtapeBinderPage() {
             onClick={() => setPage((p) => p - 1)}
             disabled={page === 0}
             className={clsx(
-              "font-retro text-2xl tracking-widest transition-colors",
+              "crt-action font-retro text-2xl tracking-widest transition-colors",
               page === 0 ? "cursor-not-allowed text-zinc-700" : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            ◀ PREV
+            <span className="crt-action__label" data-text="◀ PREV">
+              ◀ PREV
+            </span>
           </button>
-          <span className="font-retro text-xl tracking-widest text-zinc-500">
-            DISC {page + 1} OF {totalPages}
-          </span>
+          <CrtStaticText
+            as="span"
+            text={`DISC ${page + 1} OF ${totalPages}`}
+            textClassName="font-retro text-xl tracking-widest text-zinc-500"
+          />
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={page >= totalPages - 1}
             className={clsx(
-              "font-retro text-2xl tracking-widest transition-colors",
+              "crt-action font-retro text-2xl tracking-widest transition-colors",
               page >= totalPages - 1
                 ? "cursor-not-allowed text-zinc-700"
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            NEXT ▶
+            <span className="crt-action__label" data-text="NEXT ▶">
+              NEXT ▶
+            </span>
           </button>
         </footer>
       )}
@@ -189,9 +211,12 @@ export default function MixtapeBinderPage() {
               }}
             />
           </div>
-          <p className="mt-6 animate-pulse font-retro text-2xl tracking-widest text-zinc-300">
-            LOADING DISC...
-          </p>
+          <CrtStaticText
+            as="p"
+            text="LOADING DISC..."
+            className="mt-6 animate-pulse"
+            textClassName="font-retro text-2xl tracking-[0.2em] text-zinc-300"
+          />
         </div>
       )}
     </div>
@@ -306,7 +331,7 @@ function DiscSlot({
       </div>
 
       {/* Clip count below sleeve */}
-      <p className="font-retro text-xs tracking-widest text-zinc-600">
+      <p className="font-retro text-xs tracking-[0.18em] text-[#91fff2]/45">
         {project.clip_count} CLIPS
       </p>
     </button>

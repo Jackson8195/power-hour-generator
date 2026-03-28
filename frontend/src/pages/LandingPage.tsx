@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import CrtStaticText from "../components/CrtStaticText";
 
 const MENU_ITEMS = [
   { label: "INSERT MIXTAPE", to: "/mixtapes" },
@@ -9,48 +10,6 @@ const MENU_ITEMS = [
 
 export default function LandingPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [titleSweepActive, setTitleSweepActive] = useState(false);
-
-  useEffect(() => {
-    let timeoutId: number | undefined;
-    let sweepResetId: number | undefined;
-    let cancelled = false;
-
-    const queueNextSweep = () => {
-      const delay = 2200 + Math.random() * 4200;
-
-      timeoutId = window.setTimeout(() => {
-        if (cancelled) {
-          return;
-        }
-
-        setTitleSweepActive(true);
-
-        sweepResetId = window.setTimeout(() => {
-          if (cancelled) {
-            return;
-          }
-
-          setTitleSweepActive(false);
-          queueNextSweep();
-        }, 950);
-      }, delay);
-    };
-
-    queueNextSweep();
-
-    return () => {
-      cancelled = true;
-
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (sweepResetId) {
-        window.clearTimeout(sweepResetId);
-      }
-    };
-  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0a0a] scanlines">
@@ -60,15 +19,12 @@ export default function LandingPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-12 px-6">
         {/* Title block */}
         <div className="text-center">
-          <div className={`crt-title ${titleSweepActive ? "crt-title--sweeping" : ""}`}>
-            <h1
-              className="crt-title__text font-retro tracking-widest glow-text text-6xl sm:text-7xl lg:text-8xl"
-              data-text="POWER HOUR STUDIO"
-              style={{ color: "#ff2b9d" }}
-            >
-              POWER HOUR STUDIO
-            </h1>
-          </div>
+          <CrtStaticText
+            as="h1"
+            text="POWER HOUR STUDIO"
+            textClassName="font-retro tracking-widest glow-text text-6xl sm:text-7xl lg:text-8xl"
+            style={{ color: "#ff2b9d" }}
+          />
         </div>
 
         {/* DVD-menu navigation panel */}
