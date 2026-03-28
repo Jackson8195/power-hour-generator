@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   Search,
@@ -545,10 +545,18 @@ function ClipReviewCard({
   onCommit: () => void;
   onDraftChange: (range: DraftRange) => void;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const selection = draft ?? { start: clip.start_time, end: clip.end_time };
   const maxDuration = analysis?.duration || clip.duration || 0;
   const hasValidSelection = selection.end > selection.start;
   const committedClip = clip.preview_url.includes("/media/clips/");
+
+  function seekVideo(time: number) {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      videoRef.current.play();
+    }
+  }
 
   const statusCopy = {
     pending: "Waiting to download",
@@ -631,6 +639,7 @@ function ClipReviewCard({
               <>
                 {clip.preview_url && (
                   <video
+                    ref={videoRef}
                     src={clip.preview_url}
                     controls
                     preload="metadata"
@@ -667,6 +676,7 @@ function ClipReviewCard({
                     highlights={analysis?.highlights ?? []}
                     duration={maxDuration}
                     selection={selection}
+                    onSeek={seekVideo}
                   />
 
                   {analysis?.highlights?.length ? (
@@ -674,7 +684,10 @@ function ClipReviewCard({
                       {analysis.highlights.map((highlight) => (
                         <button
                           key={`${highlight.start}-${highlight.end}`}
-                          onClick={() => onDraftChange({ start: highlight.start, end: highlight.end })}
+                          onClick={() => {
+                            onDraftChange({ start: highlight.start, end: highlight.end });
+                            seekVideo(highlight.start);
+                          }}
                           className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 transition-colors hover:border-brand-500 hover:text-white"
                         >
                           {highlight.label}: {formatTime(highlight.start)} to {formatTime(highlight.end)}
@@ -771,25 +784,32 @@ function WaveformPreview({
   highlights,
   duration,
   selection,
+  onSeek,
 }: {
   waveform: number[];
   highlights: ClipAnalysis["highlights"];
   duration: number;
   selection: DraftRange;
+  onSeek?: (time: number) => void;
 }) {
+  function handleWaveformClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!duration || !onSeek) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    onSeek(Math.max(0, Math.min(ratio * duration, duration)));
+  }
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-950 to-zinc-900 px-2 py-5">
+    <div
+      className={clsx(
+        "relative overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-950 to-zinc-900 px-2 py-5",
+        onSeek && "cursor-pointer"
+      )}
+      onClick={handleWaveformClick}
+      title={onSeek ? "Click to seek video" : undefined}
+    >
+      {/* selection overlay — non-interactive */}
       <div className="pointer-events-none absolute inset-0">
-        {highlights.map((highlight) => (
-          <div
-            key={`${highlight.start}-${highlight.end}`}
-            className="absolute inset-y-0 rounded-lg bg-brand-500/12"
-            style={{
-              left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
-              width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
-            }}
-          />
-        ))}
         {selection.end > selection.start && (
           <div
             className="absolute inset-y-0 rounded-lg border border-emerald-400/70 bg-emerald-400/12"
@@ -800,7 +820,28 @@ function WaveformPreview({
           />
         )}
       </div>
-      <div className="relative flex h-28 items-end gap-[2px]">
+
+      {/* clickable highlight regions */}
+      <div className="absolute inset-0">
+        {highlights.map((highlight) => (
+          <div
+            key={`${highlight.start}-${highlight.end}`}
+            className="absolute inset-y-0 rounded-lg bg-brand-500/12 transition-colors hover:bg-brand-500/25"
+            style={{
+              left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
+              width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
+            }}
+            title={`${highlight.label} — click to play from ${formatTime(highlight.start)}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSeek?.(highlight.start);
+            }}
+          />
+        ))}
+      </div>
+
+      {/* waveform bars */}
+      <div className="pointer-events-none relative flex h-28 items-end gap-[2px]">
         {(waveform.length ? waveform : new Array(80).fill(0.15)).map((bar, index) => (
           <div
             key={`${index}-${bar}`}
