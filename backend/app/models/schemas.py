@@ -109,6 +109,7 @@ class SearchResult(BaseModel):
     thumbnail: str
     duration: str = ""
     view_count: str = ""
+    search_source: str = ""
     match_score: float = 0.0
     recommendation_reason: str = ""
 
@@ -188,6 +189,14 @@ class RenderProgress(BaseModel):
     error_message: str = ""
 
 
+class RenderLibraryEntry(BaseModel):
+    render_id: int
+    project_id: int
+    project_name: str
+    output_url: str
+    completed_at: Optional[datetime] = None
+
+
 class ClipHighlight(BaseModel):
     start: float
     end: float
@@ -208,3 +217,59 @@ class ClipAnalysisResponse(BaseModel):
 class ClipCommitRequest(BaseModel):
     start_time: float = Field(..., ge=0)
     end_time: float = Field(..., gt=0)
+
+
+class AutoGenerateProposalCreate(BaseModel):
+    prompt: str = Field(..., min_length=3, max_length=1000)
+
+
+class AutoGenerateProposalReplaceRequest(BaseModel):
+    slot_index: int = Field(..., ge=0, lt=60)
+
+
+class AutoGenerateProposalApproveRequest(BaseModel):
+    project_name: str = Field(default="", max_length=255)
+
+
+class AutoGenerateProposalItem(BaseModel):
+    slot_index: int
+    requested_title: str
+    requested_artist: str
+    youtube_id: str = ""
+    title: str = ""
+    artist: str = ""
+    thumbnail: str = ""
+    duration: str = ""
+    resolution_source: str = ""
+    reason: str = ""
+    status: str = "resolved"
+
+
+class AutoGenerateProposalResponse(BaseModel):
+    proposal_id: str
+    normalized_prompt: str
+    items: list[AutoGenerateProposalItem]
+    unresolved_count: int
+    expires_at: datetime
+
+
+class AutoGenerateApprovalResponse(BaseModel):
+    project_id: int
+    job_id: str
+    clip_ids: list[int]
+
+
+class AutoGenerateJobProgressResponse(BaseModel):
+    job_id: str
+    project_id: int
+    phase: str
+    progress: float
+    total_clips: int
+    processed_clips: int
+    current_step: str = ""
+    current_title: str = ""
+    current_artist: str = ""
+    render_id: Optional[int] = None
+    output_path: str = ""
+    error_message: str = ""
+    updated_at: datetime

@@ -1,10 +1,14 @@
 import type {
+  AutoGenerateApproval,
+  AutoGenerateJobProgress,
+  AutoGenerateProposal,
   SearchResult,
   Project,
   ProjectDetail,
   Clip,
   ClipAnalysis,
   RenderProgress,
+  RenderLibraryEntry,
   CastDevice,
 } from "./types";
 
@@ -44,6 +48,41 @@ export async function getRecommendedTracks(
   maxResults = 8
 ): Promise<SearchResult[]> {
   return request(`/api/search/recommendations/${projectId}?max_results=${maxResults}`);
+}
+
+export async function createAutoGenerateProposal(
+  prompt: string
+): Promise<AutoGenerateProposal> {
+  return request("/api/auto-generate/proposals", {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+export async function replaceAutoGenerateProposalItem(
+  proposalId: string,
+  slotIndex: number
+): Promise<AutoGenerateProposal> {
+  return request(`/api/auto-generate/proposals/${proposalId}/replace`, {
+    method: "POST",
+    body: JSON.stringify({ slot_index: slotIndex }),
+  });
+}
+
+export async function approveAutoGenerateProposal(
+  proposalId: string,
+  projectName?: string
+): Promise<AutoGenerateApproval> {
+  return request(`/api/auto-generate/proposals/${proposalId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ project_name: projectName ?? "" }),
+  });
+}
+
+export async function getAutoGenerateJob(
+  jobId: string
+): Promise<AutoGenerateJobProgress> {
+  return request(`/api/auto-generate/jobs/${jobId}`);
 }
 
 // ─── Projects ────────────────────────────────────────────
@@ -167,6 +206,10 @@ export async function getRenderStatus(
   renderId: number
 ): Promise<RenderProgress> {
   return request(`/api/render/${renderId}/status`);
+}
+
+export async function listRenderedVideos(): Promise<RenderLibraryEntry[]> {
+  return request("/api/render/library");
 }
 
 export function connectRenderWs(

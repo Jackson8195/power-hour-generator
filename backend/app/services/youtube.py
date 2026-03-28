@@ -40,7 +40,22 @@ async def search_youtube(
     """Search YouTube using the Data API v3 or yt-dlp fallback, then rerank."""
     fetch_limit = min(max(max_results * 3, 15), 30)
     if settings.youtube_api_key:
-        results = await _search_with_api(query, fetch_limit)
+        try:
+            results = await _search_with_api(query, fetch_limit)
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "YouTube Data API search failed with %s for query %r; falling back to yt-dlp search.",
+                exc.response.status_code,
+                query,
+            )
+            results = await _search_with_ytdlp(query, fetch_limit)
+        except Exception as exc:
+            logger.warning(
+                "YouTube Data API search failed for query %r (%s); falling back to yt-dlp search.",
+                query,
+                exc,
+            )
+            results = await _search_with_ytdlp(query, fetch_limit)
     else:
         results = await _search_with_ytdlp(query, fetch_limit)
 
@@ -129,6 +144,7 @@ async def _search_with_api(query: str, max_results: int) -> list[SearchResult]:
                 thumbnail=item["snippet"]["thumbnails"].get("high", item["snippet"]["thumbnails"]["default"])["url"],
                 duration=details_map.get(item["id"]["videoId"], {}).get("duration", ""),
                 view_count=details_map.get(item["id"]["videoId"], {}).get("view_count", ""),
+                search_source="youtube_api",
             )
             for item in search_data.get("items", [])
         ]
@@ -164,6 +180,7 @@ async def _search_with_ytdlp(query: str, max_results: int) -> list[SearchResult]
                 thumbnail=data.get("thumbnail", data.get("thumbnails", [{}])[-1].get("url", "")),
                 duration=_seconds_to_timestamp(data.get("duration", 0)),
                 view_count=str(data.get("view_count", "")),
+                search_source="yt_dlp",
             ))
         except json.JSONDecodeError:
             continue

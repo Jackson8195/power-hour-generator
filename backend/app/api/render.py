@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -12,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.database import get_db, async_session
 from app.models.schemas import (
-    ProjectDB, ClipDB, RenderDB, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
+    ProjectDB, ClipDB, RenderDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
 )
 from app.services.ffmpeg import RenderPipeline
 
@@ -21,6 +22,16 @@ router = APIRouter(prefix="/api/render", tags=["render"])
 
 # Active render progress tracking
 _render_progress: dict[int, float] = {}
+
+
+def _build_output_path(project_name: str, project_id: int, render_id: int) -> Path:
+    safe_name = project_name.lower().replace(" ", "_")
+    filename = f"power_hour_{safe_name}_{project_id}_render_{render_id}.mp4"
+    return settings.render_dir / filename
+
+
+def _build_output_url(output_path: str) -> str:
+    return f"/static/renders/{Path(output_path).name}"
 
 
 @router.post("/{project_id}")
@@ -50,12 +61,9 @@ async def start_render(
     ready_clips.sort(key=lambda c: c.position)
 
     # Create render record
-    output_filename = f"power_hour_{project.name.lower().replace(' ', '_')}_{project_id}.mp4"
-    output_path = settings.render_dir / output_filename
-
     render = RenderDB(
         project_id=project_id,
-        output_path=str(output_path),
+        output_path="",
         resolution=request.resolution,
         status=RenderStatus.QUEUED,
     )
@@ -64,6 +72,9 @@ async def start_render(
     await db.refresh(render)
 
     render_id = render.id
+    output_path = _build_output_path(project.name, project_id, render_id)
+    render.output_path = str(output_path)
+    await db.commit()
 
     # Prepare clip data for the pipeline
     clip_data = [
@@ -145,6 +156,32 @@ async def render_status(render_id: int, db: AsyncSession = Depends(get_db)):
         output_path=render.output_path if render.status == RenderStatus.COMPLETE else "",
         error_message=render.error_message,
     )
+
+
+@router.get("/library", response_model=list[RenderLibraryEntry])
+async def render_library(db: AsyncSession = Depends(get_db)):
+    """List completed rendered outputs for mixtape playback."""
+    result = await db.execute(
+        select(RenderDB, ProjectDB)
+        .join(ProjectDB, ProjectDB.id == RenderDB.project_id)
+        .where(RenderDB.status == RenderStatus.COMPLETE)
+        .order_by(RenderDB.completed_at.desc(), RenderDB.id.desc())
+    )
+
+    entries: list[RenderLibraryEntry] = []
+    for render, project in result.all():
+        if not render.output_path:
+            continue
+        entries.append(
+            RenderLibraryEntry(
+                render_id=render.id,
+                project_id=project.id,
+                project_name=project.name,
+                output_url=_build_output_url(render.output_path),
+                completed_at=render.completed_at,
+            )
+        )
+    return entries
 
 
 @router.websocket("/ws/{render_id}")

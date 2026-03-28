@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Project } from "../utils/types";
-import { listProjects } from "../utils/api";
 import clsx from "clsx";
+import { Film, PlayCircle, FolderOpen, X } from "lucide-react";
+import type { RenderLibraryEntry } from "../utils/types";
+import { listRenderedVideos } from "../utils/api";
 import CrtStaticText from "../components/CrtStaticText";
 
 const ITEMS_PER_PAGE = 4;
+const LAST_RENDER_STORAGE_KEY = "power-hour-last-mixtape-render";
+const DISC_DROP_DURATION_MS = 2400;
 
 const CD_GRADIENT = [
   "radial-gradient(circle at 30% 25%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.05) 28%, transparent 48%)",
@@ -22,138 +25,222 @@ function splitName(name: string): [string, string | null] {
 
 export default function MixtapeBinderPage() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [renders, setRenders] = useState<RenderLibraryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [animatingId, setAnimatingId] = useState<number | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-  const totalPages = Math.max(1, Math.ceil(projects.length / ITEMS_PER_PAGE));
-  const pageItems = projects.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  const [selectedRenderId, setSelectedRenderId] = useState<number | null>(null);
+  const [viewerRenderId, setViewerRenderId] = useState<number | null>(null);
+  const [animatingRenderId, setAnimatingRenderId] = useState<number | null>(null);
+  const [viewerStage, setViewerStage] = useState<"loading" | "playing">("loading");
 
   useEffect(() => {
-    listProjects()
-      .then(setProjects)
+    listRenderedVideos()
+      .then((data) => {
+        setRenders(data);
+        const storedRenderId = Number(window.localStorage.getItem(LAST_RENDER_STORAGE_KEY) || "");
+        const initialRender = data.find((render) => render.render_id === storedRenderId) ?? data[0] ?? null;
+        if (!initialRender) return;
+        setSelectedRenderId(initialRender.render_id);
+        const initialIndex = data.findIndex((render) => render.render_id === initialRender.render_id);
+        setPage(initialIndex >= 0 ? Math.floor(initialIndex / ITEMS_PER_PAGE) : 0);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    return () => clearTimeout(timeoutRef.current);
-  }, []);
+  const totalPages = Math.max(1, Math.ceil(renders.length / ITEMS_PER_PAGE));
+  const pageItems = renders.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  const selectedRender = useMemo(
+    () => renders.find((render) => render.render_id === selectedRenderId) ?? renders[0] ?? null,
+    [renders, selectedRenderId]
+  );
+  const viewerRender = useMemo(
+    () => renders.find((render) => render.render_id === viewerRenderId) ?? null,
+    [renders, viewerRenderId]
+  );
+  const [viewerLine1, viewerLine2] = splitName(viewerRender?.project_name ?? "");
 
-  function handleDiscClick(id: number) {
-    if (animatingId !== null) return;
-    setAnimatingId(id);
-    timeoutRef.current = setTimeout(() => {
-      navigate(`/project/${id}`);
-    }, 1200);
+  function startPlayback(renderId: number, renderOverride?: RenderLibraryEntry) {
+    if (animatingRenderId !== null) return;
+    const render = renderOverride ?? renders.find((entry) => entry.render_id === renderId);
+    if (!render) return;
+
+    setSelectedRenderId(renderId);
+    setViewerRenderId(renderId);
+    setViewerStage("loading");
+    setAnimatingRenderId(renderId);
+    window.localStorage.setItem(LAST_RENDER_STORAGE_KEY, String(renderId));
+    window.setTimeout(() => {
+      setViewerStage("playing");
+      setAnimatingRenderId(null);
+    }, DISC_DROP_DURATION_MS);
+  }
+
+  function closeViewer() {
+    setViewerRenderId(null);
+    setViewerStage("loading");
+    setAnimatingRenderId(null);
   }
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#0a0a0a] scanlines">
-      {/* CRT flicker overlay */}
       <div className="pointer-events-none fixed inset-0 animate-crt-flicker bg-transparent" />
 
-      {/* Header */}
-      <header className="relative z-10 flex items-center gap-6 px-8 pt-8">
+      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-6 pt-8 sm:px-8">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => navigate("/")}
+            className="crt-action font-retro text-xl tracking-widest text-zinc-500 transition-colors hover:text-zinc-200"
+          >
+            <span className="crt-action__label" data-text="◀ BACK">
+              ◀ BACK
+            </span>
+          </button>
+          <CrtStaticText
+            as="h1"
+            text="INSERT MIXTAPE"
+            textClassName="font-retro text-3xl tracking-widest text-zinc-200 sm:text-4xl"
+          />
+        </div>
+
         <button
-          onClick={() => navigate("/")}
-          className="crt-action font-retro text-xl tracking-widest text-zinc-500 transition-colors hover:text-zinc-200"
+          onClick={() => navigate("/works-in-progress")}
+          className="crt-action retro-button-secondary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
         >
-          <span className="crt-action__label" data-text="◀ BACK">
-            ◀ BACK
+          <FolderOpen className="h-4 w-4" />
+          <span className="crt-action__label" data-text="OPEN WIP LIBRARY">
+            OPEN WIP LIBRARY
           </span>
         </button>
-        <CrtStaticText
-          as="h1"
-          text="SELECT YOUR MIXTAPE"
-          textClassName="font-retro text-3xl tracking-widest text-zinc-200 sm:text-4xl"
-        />
       </header>
 
-      {/* Main content */}
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
+      <main className="relative z-10 flex flex-1 flex-col gap-6 px-4 py-8 sm:px-8 sm:py-10">
         {loading ? (
           <CrtStaticText
             as="p"
-            text="LOADING..."
-            textClassName="animate-pulse font-retro text-2xl tracking-[0.2em] text-[#91fff2]/70"
+            text="LOADING RENDERS..."
+            textClassName="animate-pulse text-center font-retro text-2xl tracking-[0.2em] text-[#91fff2]/70"
           />
-        ) : projects.length === 0 ? (
-          <div className="text-center">
+        ) : renders.length === 0 ? (
+          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center rounded-[30px] border border-[#1affe4]/10 bg-[#08131a]/80 px-6 py-12 text-center">
+            <Film className="h-14 w-14 text-[#ff77c2]/55" />
             <CrtStaticText
               as="p"
-              text="NO MIXTAPES FOUND"
-              textClassName="font-retro text-3xl tracking-widest text-zinc-500"
+              text="NO FINISHED MIXTAPES YET"
+              className="mt-6"
+              textClassName="font-retro text-3xl tracking-[0.18em] text-[#ff9bd2]"
             />
-            <CrtStaticText
-              as="p"
-              text="CREATE ONE TO GET STARTED"
-              className="mt-3"
-              textClassName="font-retro text-lg tracking-widest text-zinc-700"
-            />
+            <p className="mt-4 max-w-2xl font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+              Render a project from the works in progress library and the finished video will appear here as a playable disc.
+            </p>
             <button
-              onClick={() => navigate("/create")}
-              className="crt-action mt-8 font-retro text-xl tracking-widest text-brand-400 transition-colors hover:text-brand-300"
+              onClick={() => navigate("/works-in-progress")}
+              className="crt-action retro-button-primary mt-8 inline-flex items-center gap-3 rounded-xl px-5 py-3 font-retro text-sm tracking-[0.16em]"
             >
-              <span className="crt-action__label" data-text="▶ CREATE NEW">
-                ▶ CREATE NEW
+              <span className="crt-action__label" data-text="GO TO WORKS IN PROGRESS">
+                GO TO WORKS IN PROGRESS
               </span>
             </button>
           </div>
         ) : (
-          /* Binder container */
-          <div
-            style={{
-              position: "relative",
-              background: "linear-gradient(135deg, #1c1c2e 0%, #0f0f1a 100%)",
-              boxShadow: "inset 0 0 60px rgba(0,0,0,0.6), 0 12px 40px rgba(0,0,0,0.8)",
-              border: "1px solid #2a2a3a",
-              borderRadius: "10px",
-              padding: "20px 16px",
-              maxWidth: "480px",
-              width: "100%",
-            }}
-          >
-            {/* Binder spine divider */}
-            <div
-              style={{
-                position: "absolute",
-                top: "6%",
-                bottom: "6%",
-                left: "50%",
-                width: "2px",
-                background:
-                  "linear-gradient(to bottom, transparent, #2a2a3a 20%, #3a3a4a 50%, #2a2a3a 80%, transparent)",
-                transform: "translateX(-50%)",
-              }}
-            />
+          <>
+            <section className="retro-shell mx-auto w-full max-w-6xl rounded-[30px] p-5 sm:p-6">
+              <div className="relative z-10">
+                <div className="mx-auto max-w-3xl text-center">
+                  <p className="font-retro text-xs tracking-[0.34em] text-[#1affe4]/62">
+                    FINISHED MIXTAPE LIBRARY
+                  </p>
+                  <CrtStaticText
+                    as="h2"
+                    text="SELECT A DISC TO PLAY"
+                    className="mt-3"
+                    textClassName="font-retro text-3xl tracking-[0.18em] text-[#ff9bd2] sm:text-4xl"
+                  />
+                  <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+                    The binder stays front and center here. Choose a finished CD first, then press play to drop it into the walkman before the viewer opens.
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {pageItems.map((project) => (
-                <DiscSlot
-                  key={project.id}
-                  project={project}
-                  isAnimating={animatingId === project.id}
-                  isDimmed={animatingId !== null && animatingId !== project.id}
-                  onClick={() => handleDiscClick(project.id)}
-                />
-              ))}
-              {pageItems.length < ITEMS_PER_PAGE &&
-                Array.from({ length: ITEMS_PER_PAGE - pageItems.length }).map((_, i) => (
-                  <div key={`empty-${i}`} className="cd-sleeve opacity-0" />
-                ))}
-            </div>
-          </div>
+                <div className="mt-8">
+                  <div
+                    style={{
+                      position: "relative",
+                      background: "linear-gradient(135deg, #1c1c2e 0%, #0f0f1a 100%)",
+                      boxShadow: "inset 0 0 60px rgba(0,0,0,0.6), 0 12px 40px rgba(0,0,0,0.8)",
+                      border: "1px solid #2a2a3a",
+                      borderRadius: "10px",
+                      padding: "20px 16px",
+                      width: "100%",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "6%",
+                        bottom: "6%",
+                        left: "50%",
+                        width: "2px",
+                        background:
+                          "linear-gradient(to bottom, transparent, #2a2a3a 20%, #3a3a4a 50%, #2a2a3a 80%, transparent)",
+                        transform: "translateX(-50%)",
+                      }}
+                    />
+
+                    <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-3 sm:gap-4">
+                      {pageItems.map((render) => (
+                        <DiscSlot
+                          key={render.render_id}
+                          render={render}
+                          selected={selectedRender?.render_id === render.render_id}
+                          isAnimating={animatingRenderId === render.render_id}
+                          onClick={() => setSelectedRenderId(render.render_id)}
+                        />
+                      ))}
+                      {pageItems.length < ITEMS_PER_PAGE &&
+                        Array.from({ length: ITEMS_PER_PAGE - pageItems.length }).map((_, i) => (
+                          <div key={`empty-${i}`} className="cd-sleeve opacity-0" />
+                        ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 rounded-[24px] border border-[#ff77c2]/10 bg-[#120810]/90 p-5">
+                  <div className="mx-auto max-w-3xl text-center">
+                    <p className="font-retro text-sm tracking-[0.24em] text-[#1affe4]/70">
+                      SELECTED OUTPUT
+                    </p>
+                    <p className="mt-4 font-retro text-2xl tracking-[0.14em] text-[#ffb6dd]">
+                      {selectedRender?.project_name ?? "NONE"}
+                    </p>
+                    <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                      {selectedRender?.completed_at
+                        ? `Rendered ${new Date(selectedRender.completed_at).toLocaleString()}`
+                        : "Choose a rendered disc from the binder"}
+                    </p>
+                    {selectedRender ? (
+                      <button
+                        onClick={() => startPlayback(selectedRender.render_id)}
+                        disabled={animatingRenderId !== null}
+                        className="crt-action retro-button-primary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        <span className="crt-action__label" data-text="PLAY MIXTAPE">
+                          PLAY MIXTAPE
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
         )}
       </main>
 
-      {/* Pagination footer */}
-      {projects.length > 0 && (
+      {renders.length > 0 && (
         <footer className="relative z-10 flex items-center justify-center gap-8 pb-10">
           <button
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage((current) => current - 1)}
             disabled={page === 0}
             className={clsx(
               "crt-action font-retro text-2xl tracking-widest transition-colors",
@@ -170,7 +257,7 @@ export default function MixtapeBinderPage() {
             textClassName="font-retro text-xl tracking-widest text-zinc-500"
           />
           <button
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage((current) => current + 1)}
             disabled={page >= totalPages - 1}
             className={clsx(
               "crt-action font-retro text-2xl tracking-widest transition-colors",
@@ -186,77 +273,145 @@ export default function MixtapeBinderPage() {
         </footer>
       )}
 
-      {/* Loading overlay */}
-      {animatingId !== null && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/75">
+      {viewerRender ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm"
+          onClick={closeViewer}
+        >
           <div
-            className="animate-disc-spin rounded-full"
-            style={{
-              width: 88,
-              height: 88,
-              background: CD_GRADIENT,
-              boxShadow: "0 0 30px rgba(200,200,255,0.4), 0 0 60px rgba(160,160,220,0.2)",
-            }}
+            className="retro-shell relative w-full max-w-6xl rounded-[28px] p-5 sm:p-6"
+            onClick={(event) => event.stopPropagation()}
           >
-            {/* spindle hole */}
-            <div
-              style={{
-                position: "absolute",
-                width: "14%",
-                height: "14%",
-                top: "43%",
-                left: "43%",
-                borderRadius: "50%",
-                background: "#07070e",
-              }}
-            />
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-4 border-b border-[#1affe4]/10 pb-4">
+                <div>
+                  <p className="font-retro text-xs tracking-[0.32em] text-[#1affe4]/60">
+                    NOW PLAYING
+                  </p>
+                  <CrtStaticText
+                    as="h2"
+                    text={viewerRender.project_name.toUpperCase()}
+                    className="mt-2"
+                    textClassName="font-retro text-2xl tracking-[0.18em] text-[#ff9bd2] sm:text-3xl"
+                  />
+                </div>
+                <button
+                  onClick={closeViewer}
+                  className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="crt-action__label" data-text="CLOSE">
+                    CLOSE
+                  </span>
+                </button>
+              </div>
+
+              <div className="mt-5 overflow-hidden rounded-[24px] border border-[#1affe4]/10 bg-black">
+                {viewerStage === "loading" ? (
+                  <div className="mixtape-walkman flex min-h-[72vh] items-center justify-center p-6">
+                    <div className="mixtape-walkman__body mixtape-walkman__body--modal">
+                      <div className="mixtape-walkman__masthead">
+                        <span className="mixtape-walkman__brand">POWER HOUR</span>
+                        <span className="mixtape-walkman__brand">DIGITAL WALKMAN</span>
+                      </div>
+
+                      <div className="mixtape-walkman__speaker mixtape-walkman__speaker--left" />
+                      <div className="mixtape-walkman__speaker mixtape-walkman__speaker--right" />
+
+                      <div className="mixtape-walkman__screen">
+                        <p className="font-retro text-xs tracking-[0.28em] text-[#91fff2]/75">
+                          INSERTING DISC
+                        </p>
+                        <p className="mt-3 font-retro text-lg tracking-[0.12em] text-[#ffb6dd]">
+                          {viewerRender.project_name}
+                        </p>
+                        <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[#91fff2]/45">
+                          The disc is dropping into the deck and slowly spinning up before playback.
+                        </p>
+                      </div>
+
+                      <div className="mixtape-walkman__deck mixtape-walkman__deck--modal">
+                        <div className="mixtape-walkman__slot" />
+                        <div className="mixtape-walkman__window" />
+                        <div
+                          className={clsx(
+                            "mixtape-walkman__disc",
+                            "mixtape-walkman__disc--visible",
+                            "mixtape-walkman__disc--spinup"
+                          )}
+                          style={{ background: CD_GRADIENT }}
+                        >
+                          <div className="mixtape-walkman__disc-label mixtape-walkman__disc-label--top">
+                            {viewerLine1}
+                          </div>
+                          {viewerLine2 ? (
+                            <div className="mixtape-walkman__disc-label mixtape-walkman__disc-label--bottom">
+                              {viewerLine2}
+                            </div>
+                          ) : null}
+                          <div className="mixtape-walkman__disc-hole" />
+                        </div>
+                      </div>
+
+                      <div className="mixtape-walkman__controls">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <video
+                    key={viewerRender.render_id}
+                    src={viewerRender.output_url}
+                    controls
+                    autoPlay
+                    className="max-h-[78vh] w-full bg-black object-contain"
+                  />
+                )}
+              </div>
+            </div>
           </div>
-          <CrtStaticText
-            as="p"
-            text="LOADING DISC..."
-            className="mt-6 animate-pulse"
-            textClassName="font-retro text-2xl tracking-[0.2em] text-zinc-300"
-          />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
 function DiscSlot({
-  project,
+  render,
+  selected,
   isAnimating,
-  isDimmed,
   onClick,
 }: {
-  project: Project;
+  render: RenderLibraryEntry;
+  selected: boolean;
   isAnimating: boolean;
-  isDimmed: boolean;
   onClick: () => void;
 }) {
-  const [line1, line2] = splitName(project.name);
+  const [line1, line2] = splitName(render.project_name);
 
   return (
     <button
       onClick={onClick}
       className={clsx(
-        "group flex flex-col items-center gap-1.5 transition-all duration-200",
-        isDimmed && "pointer-events-none opacity-20",
+        "group flex w-full flex-col items-center gap-1.5 transition-all duration-200",
+        selected && "scale-[1.03]",
         isAnimating && "animate-disc-drop"
       )}
     >
-      {/* Sleeve pocket */}
-      <div className="cd-sleeve w-full">
-        {/* Disc */}
+      <div className="cd-sleeve mx-auto w-full max-w-[320px]">
         <div
           className="relative w-full rounded-full transition-all duration-200 group-hover:brightness-110"
           style={{
             aspectRatio: "1 / 1",
             background: CD_GRADIENT,
-            boxShadow: "0 2px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)",
+            boxShadow: selected
+              ? "0 0 0 2px rgba(26,255,228,0.45), 0 2px 12px rgba(0,0,0,0.5)"
+              : "0 2px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)",
           }}
         >
-          {/* Top outer-ring text */}
           <div
             style={{
               position: "absolute",
@@ -279,7 +434,6 @@ function DiscSlot({
             </span>
           </div>
 
-          {/* Hub ring — visual only */}
           <div
             style={{
               position: "absolute",
@@ -290,7 +444,6 @@ function DiscSlot({
             }}
           />
 
-          {/* Spindle hole */}
           <div
             style={{
               position: "absolute",
@@ -303,7 +456,6 @@ function DiscSlot({
             }}
           />
 
-          {/* Bottom outer-ring text (overflow) */}
           {line2 && (
             <div
               style={{
@@ -318,7 +470,7 @@ function DiscSlot({
                 className="font-marker text-[#111]"
                 style={{
                   fontSize: "clamp(0.42rem, 2vw, 0.65rem)",
-                  transform: "rotate(3deg)",
+                  transform: "rotate(2deg)",
                   display: "block",
                   lineHeight: 1.1,
                 }}
@@ -330,10 +482,11 @@ function DiscSlot({
         </div>
       </div>
 
-      {/* Clip count below sleeve */}
-      <p className="font-retro text-xs tracking-[0.18em] text-[#91fff2]/45">
-        {project.clip_count} CLIPS
-      </p>
+      <div className="text-center">
+        <p className="font-retro text-[0.65rem] tracking-[0.24em] text-[#91fff2]/65">
+          RENDER #{render.render_id}
+        </p>
+      </div>
     </button>
   );
 }

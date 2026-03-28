@@ -317,6 +317,239 @@
     background: linear-gradient(90deg, #ff2b9d 0%, #ff8d4d 48%, #1affe4 100%);
     box-shadow: 0 0 18px rgba(255, 43, 157, 0.18);
   }
+
+  .mixtape-walkman {
+    background:
+      radial-gradient(circle at top, rgba(255, 43, 157, 0.08), transparent 38%),
+      linear-gradient(180deg, rgba(7, 17, 24, 0.98), rgba(3, 8, 12, 1));
+  }
+
+  .mixtape-walkman__body {
+    position: relative;
+    width: min(100%, 620px);
+    aspect-ratio: 1.28 / 1;
+    border-radius: 2.4rem;
+    border: 1px solid rgba(145, 255, 242, 0.14);
+    background:
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 40%),
+      linear-gradient(145deg, rgba(82, 92, 104, 0.96), rgba(34, 41, 49, 0.98) 45%, rgba(17, 22, 29, 1));
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 -18px 30px rgba(0, 0, 0, 0.34),
+      0 18px 40px rgba(0, 0, 0, 0.38);
+    padding: 1.6rem;
+  }
+
+  .mixtape-walkman__body--modal {
+    max-width: 680px;
+  }
+
+  .mixtape-walkman__masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0 0.2rem;
+    font-family: monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    color: rgba(230, 240, 248, 0.72);
+    text-transform: uppercase;
+  }
+
+  .mixtape-walkman__screen {
+    border-radius: 1.4rem;
+    border: 1px solid rgba(26, 255, 228, 0.12);
+    background:
+      linear-gradient(180deg, rgba(7, 28, 32, 0.98), rgba(3, 14, 17, 0.96));
+    min-height: 38%;
+    padding: 1.25rem;
+    box-shadow: inset 0 0 18px rgba(26, 255, 228, 0.04);
+    margin: 0 5rem 1rem;
+  }
+
+  .mixtape-walkman__deck {
+    position: relative;
+    margin-top: 0.6rem;
+    height: 42%;
+    border-radius: 1.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(12, 19, 27, 0.98), rgba(3, 7, 11, 1));
+    overflow: hidden;
+  }
+
+  .mixtape-walkman__deck--modal {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      inset 0 12px 30px rgba(255, 255, 255, 0.03);
+  }
+
+  .mixtape-walkman__slot {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    width: 52%;
+    height: 0.4rem;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.95);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
+  }
+
+  .mixtape-walkman__window {
+    position: absolute;
+    inset: 1.9rem 1.5rem 1rem;
+    border-radius: 1.4rem;
+    border: 1px solid rgba(145, 255, 242, 0.08);
+    background:
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 36%),
+      linear-gradient(180deg, rgba(24, 40, 50, 0.5), rgba(8, 18, 25, 0.16));
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.28);
+  }
+
+  .mixtape-walkman__disc {
+    position: absolute;
+    left: 50%;
+    top: -34%;
+    width: 52%;
+    aspect-ratio: 1 / 1;
+    border-radius: 999px;
+    transform: translateX(-50%) translateY(-120%);
+    opacity: 0;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 12px 26px rgba(0, 0, 0, 0.35);
+  }
+
+  .mixtape-walkman__disc--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(26%);
+  }
+
+  .mixtape-walkman__disc--dropping {
+    animation: walkman-disc-drop 1.2s cubic-bezier(0.18, 0.78, 0.25, 1) forwards;
+    opacity: 1;
+  }
+
+  .mixtape-walkman__disc--spinup {
+    animation:
+      walkman-disc-drop 1.2s cubic-bezier(0.18, 0.78, 0.25, 1) forwards,
+      walkman-disc-spinup 1.2s linear 1.2s forwards;
+    opacity: 1;
+  }
+
+  .mixtape-walkman__disc--spinning {
+    transform: translateX(-50%) translateY(26%);
+    opacity: 1;
+    animation: walkman-disc-spin 2.4s linear infinite;
+  }
+
+  .mixtape-walkman__disc-hole {
+    position: absolute;
+    inset: 46%;
+    border-radius: 999px;
+    background: #05070b;
+  }
+
+  .mixtape-walkman__disc-label {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    text-align: center;
+    font-family: "Permanent Marker", cursive;
+    font-size: clamp(0.42rem, 1.2vw, 0.7rem);
+    line-height: 1.1;
+    color: rgba(17, 17, 17, 0.92);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+  }
+
+  .mixtape-walkman__disc-label--top {
+    top: 8%;
+    transform: rotate(-4deg);
+  }
+
+  .mixtape-walkman__disc-label--bottom {
+    bottom: 8%;
+    transform: rotate(3deg);
+  }
+
+  .mixtape-walkman__speaker {
+    position: absolute;
+    top: 4.5rem;
+    bottom: 4.8rem;
+    width: 3rem;
+    border-radius: 1.1rem;
+    background:
+      radial-gradient(circle, rgba(255, 255, 255, 0.14) 0 10%, transparent 11% 100%),
+      radial-gradient(circle, rgba(255, 255, 255, 0.1) 0 8%, transparent 9% 100%),
+      linear-gradient(180deg, rgba(20, 24, 30, 0.95), rgba(10, 14, 18, 1));
+    background-size: 0.7rem 0.7rem, 1rem 1rem, 100% 100%;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      inset 0 0 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .mixtape-walkman__speaker--left {
+    left: 1.2rem;
+  }
+
+  .mixtape-walkman__speaker--right {
+    right: 1.2rem;
+  }
+
+  .mixtape-walkman__controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.9rem;
+    margin-top: 1rem;
+  }
+
+  .mixtape-walkman__controls span {
+    width: 3.5rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(30, 36, 42, 0.95));
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+}
+
+@keyframes walkman-disc-drop {
+  0% {
+    transform: translateX(-50%) translateY(-140%) scale(0.98);
+  }
+  55% {
+    transform: translateX(-50%) translateY(24%) scale(1);
+  }
+  72% {
+    transform: translateX(-50%) translateY(18%) scale(1);
+  }
+  100% {
+    transform: translateX(-50%) translateY(26%) scale(1);
+  }
+}
+
+@keyframes walkman-disc-spin {
+  from {
+    transform: translateX(-50%) translateY(26%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-50%) translateY(26%) rotate(360deg);
+  }
+}
+
+@keyframes walkman-disc-spinup {
+  from {
+    transform: translateX(-50%) translateY(26%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-50%) translateY(26%) rotate(300deg);
+  }
 }
 
 @layer utilities {

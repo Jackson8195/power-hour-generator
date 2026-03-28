@@ -39,6 +39,12 @@ import CrtStaticText from "../components/CrtStaticText";
 
 type DraftRange = { start: number; end: number };
 
+function formatSearchSourceLabel(source: string): string {
+  if (source === "youtube_api") return "YOUTUBE API";
+  if (source === "yt_dlp") return "YT-DLP";
+  return source ? source.replace(/_/g, " ").toUpperCase() : "";
+}
+
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
@@ -182,6 +188,9 @@ export default function ProjectPage() {
   }
 
   async function handleExpandClip(clip: Clip) {
+    if (clip.preview_url.includes("/media/clips/")) {
+      return;
+    }
     const nextExpanded = expandedClipId === clip.id ? null : clip.id;
     setExpandedClipId(nextExpanded);
     if (nextExpanded === clip.id && clip.status === "ready") {
@@ -533,6 +542,8 @@ function SearchResultCard({
   badgeLabel?: string;
   subcopy?: string;
 }) {
+  const sourceLabel = formatSearchSourceLabel(result.search_source);
+
   return (
     <div className="retro-project-card flex items-center gap-4 rounded-[20px] p-4">
       <img
@@ -546,6 +557,11 @@ function SearchResultCard({
           {badgeLabel ? (
             <span className="rounded-full border border-[#1affe4]/14 bg-[#08141b] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#91fff2]/70">
               {badgeLabel}
+            </span>
+          ) : null}
+          {sourceLabel ? (
+            <span className="rounded-full border border-[#ff77c2]/18 bg-[#140913] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#ffb6dd]/80">
+              {sourceLabel}
             </span>
           ) : null}
         </div>
@@ -667,7 +683,7 @@ function ClipReviewCard({
           </div>
         </div>
 
-        {clip.status === "ready" && (
+        {clip.status === "ready" && !committedClip && (
           <button
             onClick={onExpand}
             className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
@@ -693,6 +709,12 @@ function ClipReviewCard({
       {clip.status !== "ready" && (
         <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
           {clip.status === "error" ? clip.source_title + " failed to process." : statusCopy}
+        </div>
+      )}
+
+      {clip.status === "ready" && committedClip && (
+        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+          This clip is already trimmed. Replace or delete it to change the song selection.
         </div>
       )}
 

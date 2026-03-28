@@ -1,5 +1,5 @@
 import { Outlet, Link } from "react-router-dom";
-import { Beer, Home } from "lucide-react";
+import { Beer, Home, FolderOpen } from "lucide-react";
 
 export default function Layout() {
   return (
@@ -25,6 +25,15 @@ export default function Layout() {
               <Home className="h-4 w-4" />
               <span className="crt-action__label" data-text="MENU">
                 MENU
+              </span>
+            </Link>
+            <Link
+              to="/works-in-progress"
+              className="crt-action flex items-center gap-2 rounded-lg border border-transparent px-3 py-2 font-retro text-sm tracking-[0.16em] text-[#91fff2]/70 transition-colors hover:border-[#1affe4]/20 hover:bg-[#08161f] hover:text-[#defffb]"
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span className="crt-action__label" data-text="WIP">
+                WIP
               </span>
             </Link>
           </nav>

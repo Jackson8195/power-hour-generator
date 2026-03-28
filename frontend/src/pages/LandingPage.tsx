@@ -4,6 +4,7 @@ import CrtStaticText from "../components/CrtStaticText";
 
 const MENU_ITEMS = [
   { label: "INSERT MIXTAPE", to: "/mixtapes" },
+  { label: "WORKS IN PROGRESS", to: "/works-in-progress" },
   { label: "CREATE NEW", to: "/create" },
   { label: "AUTO GENERATE", to: "/auto-generate" },
 ] as const;

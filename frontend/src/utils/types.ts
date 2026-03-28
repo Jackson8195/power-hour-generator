@@ -5,6 +5,7 @@ export interface SearchResult {
   thumbnail: string;
   duration: string;
   view_count: string;
+  search_source: string;
   match_score: number;
   recommendation_reason: string;
 }
@@ -55,6 +56,14 @@ export interface RenderProgress {
   error_message: string;
 }
 
+export interface RenderLibraryEntry {
+  render_id: number;
+  project_id: number;
+  project_name: string;
+  output_url: string;
+  completed_at: string | null;
+}
+
 export interface CastDevice {
   id: string;
   name: string;
@@ -77,4 +86,48 @@ export interface ClipAnalysis {
   suggested_end: number;
   waveform: number[];
   highlights: ClipHighlight[];
+}
+
+export interface AutoGenerateProposalItem {
+  slot_index: number;
+  requested_title: string;
+  requested_artist: string;
+  youtube_id: string;
+  title: string;
+  artist: string;
+  thumbnail: string;
+  duration: string;
+  resolution_source: string;
+  reason: string;
+  status: "resolved" | "unresolved";
+}
+
+export interface AutoGenerateProposal {
+  proposal_id: string;
+  normalized_prompt: string;
+  items: AutoGenerateProposalItem[];
+  unresolved_count: number;
+  expires_at: string;
+}
+
+export interface AutoGenerateApproval {
+  project_id: number;
+  job_id: string;
+  clip_ids: number[];
+}
+
+export interface AutoGenerateJobProgress {
+  job_id: string;
+  project_id: number;
+  phase: "queued" | "processing" | "rendering" | "complete" | "error";
+  progress: number;
+  total_clips: number;
+  processed_clips: number;
+  current_step: string;
+  current_title: string;
+  current_artist: string;
+  render_id: number | null;
+  output_path: string;
+  error_message: string;
+  updated_at: string;
 }

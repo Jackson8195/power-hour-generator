@@ -3,12 +3,16 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
     # API Keys
     youtube_api_key: str = ""
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5-mini"
 
     # Paths
     media_dir: Path = Path("./media")
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
     countdown_start: int = 55  # show countdown at this second
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(BACKEND_DIR / ".env"),
         "env_file_encoding": "utf-8",
     }
 

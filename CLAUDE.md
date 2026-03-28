@@ -35,6 +35,7 @@ Important:
 - Do not reintroduce automatic final clip selection during download.
 - Recommendations should guide the user, not decide for them.
 - Rendering should only use clips that have a valid saved selection.
+- Exception: the AI Auto Generate flow is allowed to auto-select and auto-trim clips after the user explicitly approves an AI-proposed playlist.
 
 ## Runtime Notes
 
@@ -94,6 +95,7 @@ When changing backend behavior:
   - update draft selection
   - use suggestion
   - commit trimmed clip
+- AI auto-generate should stay on its own additive API path and should not silently change the manual review-first endpoints
 - Avoid silently mutating storage semantics in render code
 - Keep render validation strict: no render if a clip has no valid selected range
 
@@ -119,6 +121,7 @@ UX expectations:
 - Users should understand whether they are reviewing a full source video or an already-trimmed committed clip
 - Saving a range should feel non-destructive
 - Trimming should be the explicit destructive/storage-saving action
+- AI auto-generate may create already-trimmed clips after approval, but that should remain visually and behaviorally distinct from the manual review flow
 
 ## Styling Guidance
 

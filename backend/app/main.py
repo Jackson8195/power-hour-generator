@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api import search, downloads, clips, projects, render, cast
+from app.api import search, downloads, clips, projects, render, cast, auto_generate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ app.include_router(clips.router)
 app.include_router(projects.router)
 app.include_router(render.router)
 app.include_router(cast.router)
+app.include_router(auto_generate.router)
 
 
 @app.get("/api/health")
@@ -75,6 +76,7 @@ async def health_check():
         "version": "0.1.0",
         "ffmpeg_path": settings.ffmpeg_path,
         "youtube_api_configured": bool(settings.youtube_api_key),
+        "openai_api_configured": bool(settings.openai_api_key),
     }
 
 
