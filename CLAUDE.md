@@ -26,7 +26,7 @@ Current intended flow:
    - video preview
    - equalizer-style waveform
    - highlighted recommended sections
-   - editable start/end selection
+   - a draggable selection window on the waveform
 5. User chooses the exact range. It may be shorter or longer than 60 seconds.
 6. "Save range" stores the user’s chosen timestamps as draft selection.
 7. "Trim and discard full video" creates the final clip file and deletes the original full download.
@@ -55,6 +55,11 @@ python3 -m compileall backend/app
 bash scripts/start.sh
 ```
 
+Docker notes:
+- A Docker-based local-share path now exists via [`docker-compose.yml`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/docker-compose.yml)
+- Docker persistence uses `backend/data/power_hour.db` plus `backend/media`
+- Docker is intended for easier sharing to a newer Mac, not as the primary verified workflow on this machine
+
 ## Source of Truth
 
 Key files:
@@ -74,12 +79,13 @@ Key files:
 
 Persistent DB:
 - SQLite file at `backend/power_hour.db`
+- Docker path: `backend/data/power_hour.db`
 
 Media storage:
-- Review-stage source downloads live under `backend/media`
+- Review-stage source downloads live under `backend/media/downloads`
 - Final committed trimmed clips live under `backend/media/clips`
 - Analysis sidecars live under `backend/media/analysis`
-- Render outputs live under `backend/static/renders`
+- Render outputs live under `backend/media/renders`
 
 Behavior expectations:
 - Restarting the backend should not wipe the database
@@ -111,9 +117,10 @@ When changing the frontend:
 - Show recommendation data as guidance, not authority
 - Keep the clip review controls obvious:
   - preview
-  - waveform
+  - waveform editor
   - suggested regions
-  - start/end controls
+  - draggable selection window
+  - visible selected duration
   - save draft
   - commit trim
 
