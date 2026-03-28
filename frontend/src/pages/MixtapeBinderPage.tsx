@@ -414,7 +414,7 @@ function DiscSlot({
             <span
               className="font-marker text-[#111]"
               style={{
-                fontSize: "clamp(0.42rem, 2vw, 0.65rem)",
+                fontSize: "clamp(0.84rem, 4vw, 1.3rem)",
                 transform: "rotate(-3deg)",
                 display: "block",
                 lineHeight: 1.1,
@@ -459,7 +459,7 @@ function DiscSlot({
               <span
                 className="font-marker text-[#111]"
                 style={{
-                  fontSize: "clamp(0.42rem, 2vw, 0.65rem)",
+                  fontSize: "clamp(0.84rem, 4vw, 1.3rem)",
                   transform: "rotate(2deg)",
                   display: "block",
                   lineHeight: 1.1,

@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app/backend
+    env_file:
+      - backend/.env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:///./data/power_hour.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/media:/app/backend/media
+      - ./backend/data:/app/backend/data
+      - ./backend/.env:/app/backend/.env:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
