@@ -14,7 +14,7 @@ export default function App() {
       <Routes>
         {/* Full-screen retro pages — no Layout wrapper */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/mixtapes" element={<MixtapeBinderPage />} />
+        <Route path="/power-hours" element={<MixtapeBinderPage />} />
         <Route path="/auto-generate" element={<AutoGeneratePage />} />
         <Route path="/auto-generate/progress/:jobId" element={<AutoGenerateProgressPage />} />
 
