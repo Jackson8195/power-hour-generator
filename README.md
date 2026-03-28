@@ -58,6 +58,34 @@ choco install ffmpeg
 
 ## Quick Start
 
+### Docker local share
+
+For a casual local user, the easiest setup is Docker Desktop.
+
+Prerequisite:
+- Docker Desktop for Mac
+
+Steps:
+
+```bash
+git clone <your-repo-url>
+cd power-hour-generator
+cp .env.example backend/.env
+# Edit backend/.env and add any API keys you want to use
+docker compose up --build
+```
+
+Then open **http://localhost:5173**.
+
+Notes:
+- Docker keeps the app local on the same machine.
+- Project data persists in `backend/power_hour.db`.
+- Media files persist in `backend/media`.
+- Chromecast/network discovery may not behave reliably from Docker on macOS.
+  Browser playback and system-level AirPlay are the safer fallback.
+
+### Standard developer setup
+
 ### 1. Clone & install backend
 
 ```bash
@@ -166,10 +194,10 @@ Once running, visit **http://localhost:8000/docs** for the interactive Swagger U
 ## Storage Notes
 
 - Project data persists in `backend/power_hour.db`
-- Review-stage source downloads are stored in `backend/media`
+- Review-stage source downloads are stored in `backend/media/downloads`
 - Final committed trimmed clips are stored in `backend/media/clips`
 - Analysis sidecars are stored in `backend/media/analysis`
-- Final renders are stored in `backend/static/renders`
+- Final renders are stored in `backend/media/renders`
 
 ## License
 
