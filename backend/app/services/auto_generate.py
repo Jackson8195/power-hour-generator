@@ -6,7 +6,6 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Iterable
 from uuid import uuid4
 
@@ -14,6 +13,7 @@ from openai import AsyncOpenAI
 
 from app.api.clip_utils import remove_clip_analysis
 from app.core.config import settings
+from app.core.security import public_render_url, resolve_managed_path, unlink_managed_file
 from app.models.schemas import AutoGenerateProposalItem, SearchResult
 from app.services.audio_analysis import analyze_audio
 from app.services.ffmpeg import extract_clip_segment
@@ -28,6 +28,8 @@ MAX_PLANNING_ATTEMPTS = 4
 MAX_REPLACEMENT_ATTEMPTS = 3
 GLOBAL_AUTO_PROCESS_SEMAPHORE = asyncio.Semaphore(1)
 _AUTO_PROCESS_TASKS: set[asyncio.Task] = set()
+AUTO_PROCESS_FAILURE_MESSAGE = "Automatic clip processing failed."
+AUTO_RENDER_FAILURE_MESSAGE = "Automatic final render failed."
 
 
 @dataclass
@@ -175,7 +177,7 @@ def job_to_response(job: AutoGenerateJob) -> dict:
         "current_title": job.current_title,
         "current_artist": job.current_artist,
         "render_id": job.render_id,
-        "output_path": job.output_path,
+        "output_path": public_render_url(job.output_path) if job.output_path else "",
         "error_message": job.error_message,
         "updated_at": job.updated_at,
     }
@@ -274,7 +276,8 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
 
                 dl_result = await download_video(clip.youtube_id)
                 source_file_path = dl_result["file_path"]
-                if not source_file_path or not Path(source_file_path).exists():
+                resolved_source = resolve_managed_path(source_file_path, settings.media_dir)
+                if not resolved_source or not resolved_source.exists():
                     raise RuntimeError("Download completed but no local media file was found")
 
                 if dl_result.get("title"):
@@ -294,7 +297,7 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
                 clip.status = ClipStatus.ANALYZING
                 await db.commit()
 
-                analysis = await analyze_audio(source_file_path)
+                analysis = await analyze_audio(str(resolved_source))
                 if not analysis.get("waveform") or float(analysis.get("duration", 0) or 0) <= 0:
                     raise RuntimeError("Audio analysis did not produce waveform data")
 
@@ -314,13 +317,13 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
                 )
                 output_path = settings.clips_dir / f"{clip.youtube_id or f'clip_{clip.id}'}_{clip.id}.mp4"
                 await extract_clip_segment(
-                    source_path=str(source_file_path),
+                    source_path=str(resolved_source),
                     output_path=str(output_path),
                     start_time=suggested_start,
                     end_time=suggested_end,
                 )
 
-                Path(source_file_path).unlink(missing_ok=True)
+                unlink_managed_file(str(resolved_source), settings.media_dir)
                 remove_clip_analysis(clip.id)
 
                 clip.bpm = analysis.get("bpm")
@@ -346,7 +349,7 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
             except Exception as exc:
                 logger.error("Auto-processing failed for clip %s: %s", clip_id, exc)
                 clip.status = ClipStatus.ERROR
-                clip.error_message = str(exc)
+                clip.error_message = AUTO_PROCESS_FAILURE_MESSAGE
                 await db.commit()
                 await _update_job_processing(
                     job_id=job_id,
@@ -784,10 +787,11 @@ async def _run_auto_render(job_id: str, project_id: int) -> None:
                 progress=100.0,
                 current_step="Final render complete",
                 output_path=str(output_path),
+                error_message="",
             )
         except Exception as exc:
             logger.error("Auto-render failed for project %s: %s", project_id, exc)
             render.status = RenderStatus.ERROR
-            render.error_message = str(exc)
+            render.error_message = AUTO_RENDER_FAILURE_MESSAGE
             await db.commit()
-            await _mark_job_error(job_id, str(exc))
+            await _mark_job_error(job_id, AUTO_RENDER_FAILURE_MESSAGE)

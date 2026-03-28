@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import settings
+from app.core.security import resolve_managed_path
 from app.models.schemas import ClipDB, ClipResponse
 
 
@@ -32,19 +33,16 @@ def remove_clip_analysis(clip_id: int) -> None:
 def media_url_for_path(file_path: str) -> str:
     if not file_path:
         return ""
-    path = Path(file_path)
-    try:
-        relative = path.relative_to(settings.media_dir.resolve())
-    except ValueError:
-        try:
-            relative = path.relative_to(settings.media_dir)
-        except ValueError:
-            return ""
+    path = resolve_managed_path(file_path, settings.media_dir)
+    if not path:
+        return ""
+    relative = path.relative_to(settings.media_dir.resolve())
     return f"/media/{relative.as_posix()}"
 
 
 def serialize_clip(clip: ClipDB) -> ClipResponse:
     data = ClipResponse.model_validate(clip).model_dump()
+    data["file_path"] = ""
     data["preview_url"] = media_url_for_path(clip.file_path)
     data["has_selection"] = bool(clip.file_path and clip.end_time > clip.start_time)
     return ClipResponse(**data)

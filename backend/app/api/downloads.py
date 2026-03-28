@@ -2,13 +2,14 @@
 
 import asyncio
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
+from app.core.security import resolve_managed_path, unlink_managed_file
 from app.models.schemas import ClipDB, ClipStatus
 from app.api.clip_utils import remove_clip_analysis, save_clip_analysis
 from app.services.youtube import download_video
@@ -19,6 +20,9 @@ router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 
 # Track active downloads
 _active_downloads: dict[str, asyncio.Task] = {}
+
+
+DOWNLOAD_FAILURE_MESSAGE = "Download or analysis failed for this clip."
 
 
 @router.post("/{clip_id}/start")
@@ -34,7 +38,7 @@ async def start_download(clip_id: int, db: AsyncSession = Depends(get_db)):
         return {"status": "already_downloading", "clip_id": clip_id}
 
     if clip.file_path:
-        Path(clip.file_path).unlink(missing_ok=True)
+        unlink_managed_file(clip.file_path, settings.media_dir)
         clip.file_path = ""
     remove_clip_analysis(clip.id)
 
@@ -66,7 +70,8 @@ async def _download_and_analyze(clip_id: int, youtube_id: str):
 
             dl_result = await download_video(youtube_id)
             source_file_path = dl_result["file_path"]
-            if not source_file_path or not Path(source_file_path).exists():
+            resolved_source = resolve_managed_path(source_file_path, settings.media_dir)
+            if not resolved_source or not resolved_source.exists():
                 raise RuntimeError("Download completed but no local media file was found")
 
             if dl_result.get("title"):
@@ -78,12 +83,12 @@ async def _download_and_analyze(clip_id: int, youtube_id: str):
             clip.status = ClipStatus.ANALYZING
             await db.commit()
 
-            analysis = await analyze_audio(source_file_path)
+            analysis = await analyze_audio(str(resolved_source))
             if not analysis.get("waveform") or float(analysis.get("duration", 0) or 0) <= 0:
                 raise RuntimeError("Audio analysis did not produce waveform data")
             clip.bpm = analysis.get("bpm")
             clip.energy = analysis.get("energy")
-            clip.file_path = source_file_path
+            clip.file_path = str(resolved_source)
             clip.duration = float(analysis.get("duration", dl_result.get("duration", 0)) or 0)
             clip.start_time = 0.0
             clip.end_time = 0.0
@@ -98,7 +103,7 @@ async def _download_and_analyze(clip_id: int, youtube_id: str):
         except Exception as e:
             logger.error(f"Download/analysis failed for clip {clip_id}: {e}")
             clip.status = ClipStatus.ERROR
-            clip.error_message = str(e)
+            clip.error_message = DOWNLOAD_FAILURE_MESSAGE
             await db.commit()
 
         finally:
@@ -117,6 +122,6 @@ async def download_status(clip_id: int, db: AsyncSession = Depends(get_db)):
     return {
         "clip_id": clip.id,
         "status": clip.status,
-        "file_path": clip.file_path,
-        "error_message": clip.error_message,
+        "has_media": bool(clip.file_path),
+        "error_message": clip.error_message if clip.status == ClipStatus.ERROR else "",
     }

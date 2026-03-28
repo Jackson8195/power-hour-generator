@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import async_session
+from app.core.security import resolve_managed_path
 from app.models.schemas import ClipDB, RenderDB
 
 
@@ -27,7 +28,9 @@ async def _migrate_clip_files(db) -> None:
         if not clip.file_path:
             continue
 
-        source = Path(clip.file_path)
+        source = resolve_managed_path(clip.file_path, settings.media_dir)
+        if not source:
+            continue
         if not source.exists():
             continue
 
@@ -61,8 +64,17 @@ async def _migrate_render_files(db) -> None:
         source = Path(render.output_path)
         if not source.is_absolute():
             source = (settings.media_dir.parent / source).resolve()
+        else:
+            source = source.resolve()
 
         if not source.exists():
+            continue
+
+        allowed_legacy_roots = {
+            settings.render_dir.resolve(),
+            legacy_static_dir,
+        }
+        if not any(source == root or root in source.parents for root in allowed_legacy_roots):
             continue
 
         target = settings.render_dir / source.name

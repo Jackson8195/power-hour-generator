@@ -1,7 +1,5 @@
 """Project CRUD endpoints."""
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from app.api.clip_utils import remove_clip_analysis, serialize_clip
 from app.core.database import get_db
+from app.core.config import settings
+from app.core.security import unlink_managed_file
 from app.models.schemas import (
     ProjectDB, ClipDB, ProjectCreate, ProjectResponse, ProjectDetail,
 )
@@ -88,7 +88,7 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
 
     for clip in project.clips:
         if clip.file_path:
-            Path(clip.file_path).unlink(missing_ok=True)
+            unlink_managed_file(clip.file_path, settings.media_dir)
         remove_clip_analysis(clip.id)
 
     await db.delete(project)

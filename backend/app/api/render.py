@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db, async_session
+from app.core.security import public_render_url
 from app.models.schemas import (
     ProjectDB, ClipDB, RenderDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
 )
@@ -31,7 +32,7 @@ def _build_output_path(project_name: str, project_id: int, render_id: int) -> Pa
 
 
 def _build_output_url(output_path: str) -> str:
-    return f"/static/renders/{Path(output_path).name}"
+    return public_render_url(output_path)
 
 
 @router.post("/{project_id}")
@@ -133,7 +134,7 @@ async def _run_render(
         except Exception as e:
             logger.error(f"Render {render_id} failed: {e}")
             render.status = RenderStatus.ERROR
-            render.error_message = str(e)
+            render.error_message = "Render failed."
             await db.commit()
 
         finally:
@@ -153,8 +154,8 @@ async def render_status(render_id: int, db: AsyncSession = Depends(get_db)):
         render_id=render.id,
         status=render.status,
         progress=_render_progress.get(render_id, render.progress),
-        output_path=render.output_path if render.status == RenderStatus.COMPLETE else "",
-        error_message=render.error_message,
+        output_path=_build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
+        error_message=render.error_message if render.status == RenderStatus.ERROR else "",
     )
 
 
@@ -211,7 +212,7 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                             "render_id": render_id,
                             "progress": render.progress,
                             "status": render.status.value,
-                            "output_path": render.output_path,
+                            "output_path": _build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
                         })
                         if render.status in (RenderStatus.COMPLETE, RenderStatus.ERROR):
                             break

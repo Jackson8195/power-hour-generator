@@ -182,7 +182,7 @@ export async function startDownload(
 
 export async function getDownloadStatus(
   clipId: number
-): Promise<{ clip_id: number; status: string; file_path: string }> {
+): Promise<{ clip_id: number; status: string; has_media: boolean; error_message: string }> {
   return request(`/api/downloads/${clipId}/status`);
 }
 
@@ -257,8 +257,6 @@ export async function stopCasting(): Promise<void> {
 export async function healthCheck(): Promise<{
   status: string;
   version: string;
-  ffmpeg_path: string;
-  youtube_api_configured: boolean;
 }> {
   return request("/api/health");
 }

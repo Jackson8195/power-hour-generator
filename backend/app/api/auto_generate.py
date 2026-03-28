@@ -27,6 +27,8 @@ from app.services.auto_generate import (
 )
 
 router = APIRouter(prefix="/api/auto-generate", tags=["auto-generate"])
+PROPOSAL_FAILURE_MESSAGE = "AI playlist generation failed."
+APPROVAL_FAILURE_MESSAGE = "AI playlist approval failed."
 
 
 @router.post("/proposals", response_model=AutoGenerateProposalResponse)
@@ -36,7 +38,7 @@ async def create_proposal(payload: AutoGenerateProposalCreate):
         proposal = await create_playlist_proposal(payload.prompt)
         return proposal_to_response(proposal)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=PROPOSAL_FAILURE_MESSAGE) from exc
 
 
 @router.post("/proposals/{proposal_id}/replace", response_model=AutoGenerateProposalResponse)
@@ -55,7 +57,7 @@ async def replace_proposal_item(proposal_id: str, payload: AutoGenerateProposalR
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=PROPOSAL_FAILURE_MESSAGE) from exc
 
 
 @router.post("/proposals/{proposal_id}/approve", response_model=AutoGenerateApprovalResponse)
@@ -73,35 +75,38 @@ async def approve_proposal(
     if unresolved:
         raise HTTPException(status_code=400, detail="Proposal still has unresolved songs")
 
-    project = ProjectDB(
-        name=(payload.project_name or proposal.normalized_prompt[:255]).strip() or "AI Power Hour",
-        description=f"AI generated from prompt: {proposal.normalized_prompt}",
-    )
-    db.add(project)
-    await db.flush()
-
-    clips: list[ClipDB] = []
-    for item in proposal.items:
-        clip = ClipDB(
-            project_id=project.id,
-            position=item.slot_index,
-            source_url=f"https://www.youtube.com/watch?v={item.youtube_id}",
-            source_title=item.title,
-            source_artist=item.artist,
-            source_thumbnail=item.thumbnail,
-            youtube_id=item.youtube_id,
-            status=ClipStatus.PENDING,
+    try:
+        project = ProjectDB(
+            name=(payload.project_name or proposal.normalized_prompt[:255]).strip() or "AI Power Hour",
+            description=f"AI generated from prompt: {proposal.normalized_prompt}",
         )
-        db.add(clip)
-        clips.append(clip)
+        db.add(project)
+        await db.flush()
 
-    await db.flush()
-    clip_ids = [clip.id for clip in clips]
-    await db.commit()
+        clips: list[ClipDB] = []
+        for item in proposal.items:
+            clip = ClipDB(
+                project_id=project.id,
+                position=item.slot_index,
+                source_url=f"https://www.youtube.com/watch?v={item.youtube_id}",
+                source_title=item.title,
+                source_artist=item.artist,
+                source_thumbnail=item.thumbnail,
+                youtube_id=item.youtube_id,
+                status=ClipStatus.PENDING,
+            )
+            db.add(clip)
+            clips.append(clip)
 
-    job = await create_auto_generate_job(project.id, len(clip_ids))
-    start_auto_process_queue(job.job_id, project.id, clip_ids)
-    return AutoGenerateApprovalResponse(project_id=project.id, job_id=job.job_id, clip_ids=clip_ids)
+        await db.flush()
+        clip_ids = [clip.id for clip in clips]
+        await db.commit()
+
+        job = await create_auto_generate_job(project.id, len(clip_ids))
+        start_auto_process_queue(job.job_id, project.id, clip_ids)
+        return AutoGenerateApprovalResponse(project_id=project.id, job_id=job.job_id, clip_ids=clip_ids)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=APPROVAL_FAILURE_MESSAGE) from exc
 
 
 @router.get("/jobs/{job_id}", response_model=AutoGenerateJobProgressResponse)

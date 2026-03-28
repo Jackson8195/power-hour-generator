@@ -356,7 +356,7 @@ export default function ProjectPage() {
                 {renderProgress.status === "complete" && renderProgress.output_path && (
                   <div className="mt-4 flex flex-wrap gap-3">
                     <a
-                      href={`/static/renders/${renderProgress.output_path.split("/").pop()}`}
+                      href={renderProgress.output_path}
                       target="_blank"
                       className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-sm tracking-[0.16em]"
                       rel="noreferrer"
@@ -730,61 +730,78 @@ function ClipReviewCard({
       )}
 
       {expanded && clip.status === "ready" && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-4">
-            {loadingAnalysis ? (
-              <div className="retro-panel flex h-56 items-center justify-center rounded-[22px] text-[#91fff2]/55">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading analysis...
-              </div>
-            ) : (
-              <>
-                {clip.preview_url && (
-                  <video
-                    ref={videoRef}
-                    src={clip.preview_url}
-                    controls
-                    preload="metadata"
-                    className="w-full rounded-[22px] border border-[#1affe4]/12 bg-black"
-                  />
-                )}
-
-                <div className="retro-panel rounded-[22px] p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">SUGGESTED ENERGY MAP</p>
-                      <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                        Bright blocks point to likely chorus or high-energy sections.
-                      </p>
-                    </div>
-                    {analysis && (
-                      <button
-                        onClick={onUseSuggestion}
-                        disabled={saving}
-                        className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
-                      >
-                        {saving ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5" />
-                        )}
-                        <span className="crt-action__label" data-text="USE RECOMMENDATION">
-                          USE RECOMMENDATION
-                        </span>
-                      </button>
+        <div className="mt-4">
+          {loadingAnalysis ? (
+            <div className="retro-panel flex h-56 items-center justify-center rounded-[22px] text-[#91fff2]/55">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading analysis...
+            </div>
+          ) : (
+            <div className="retro-panel rounded-[22px] p-4">
+              <div className="mb-4 flex flex-col gap-3 border-b border-[#1affe4]/10 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">TRIM ON THE WAVEFORM</p>
+                  <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                    Drag the left or right edge of the selection window to choose the exact clip length.
+                  </p>
+                </div>
+                {analysis && (
+                  <button
+                    onClick={onUseSuggestion}
+                    disabled={saving}
+                    className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
                     )}
-                  </div>
+                    <span className="crt-action__label" data-text="USE RECOMMENDATION">
+                      USE RECOMMENDATION
+                    </span>
+                  </button>
+                )}
+              </div>
 
-                  <WaveformPreview
+              <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="space-y-3">
+                  {clip.preview_url && (
+                    <video
+                      ref={videoRef}
+                      src={clip.preview_url}
+                      controls
+                      preload="metadata"
+                      className="w-full rounded-[22px] border border-[#1affe4]/12 bg-black"
+                    />
+                  )}
+                  <div className="rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 p-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                    <div className="flex items-center justify-between">
+                      <span>Chosen range</span>
+                      <span className="font-mono text-zinc-200">
+                        {formatTime(selection.start)} to {formatTime(selection.end)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span>Selection length</span>
+                      <span className="font-mono text-zinc-200">
+                        {formatTime(Math.max(selection.end - selection.start, 0))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <WaveformRangeEditor
                     waveform={analysis?.waveform ?? []}
                     highlights={analysis?.highlights ?? []}
                     duration={maxDuration}
                     selection={selection}
                     onSeek={seekVideo}
+                    onChange={onDraftChange}
                   />
 
                   {analysis?.highlights?.length ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {analysis.highlights.map((highlight) => (
                         <button
                           key={`${highlight.start}-${highlight.end}`}
@@ -799,107 +816,99 @@ function ClipReviewCard({
                       ))}
                     </div>
                   ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={onSaveDraft}
+                      disabled={!hasValidSelection || saving}
+                      className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                      <span className="crt-action__label" data-text="SAVE RANGE">
+                        SAVE RANGE
+                      </span>
+                    </button>
+                    <button
+                      onClick={onCommit}
+                      disabled={!hasValidSelection || committing}
+                      className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {committing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Scissors className="h-3.5 w-3.5" />
+                      )}
+                      <span className="crt-action__label" data-text="TRIM AND DISCARD FULL VIDEO">
+                        TRIM AND DISCARD FULL VIDEO
+                      </span>
+                    </button>
+                  </div>
+
+                  <p className="font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/40">
+                    Saving keeps your chosen timestamps. Trimming creates the final clip file and frees the original download.
+                  </p>
                 </div>
-              </>
-            )}
-          </div>
-
-          <div className="retro-panel rounded-[22px] p-4">
-            <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">PICK THE EXACT RANGE</p>
-            <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-              Choose any start and end time. It does not need to be exactly 60 seconds.
-            </p>
-
-            <div className="mt-4 space-y-4">
-              <RangeControl
-                label="Start"
-                value={selection.start}
-                max={Math.max(maxDuration, selection.end || 0)}
-                onChange={(value) =>
-                  onDraftChange({
-                    start: Math.min(value, Math.max(selection.end - 0.5, 0)),
-                    end: selection.end,
-                  })
-                }
-              />
-              <RangeControl
-                label="End"
-                value={selection.end}
-                max={Math.max(maxDuration, selection.end || 0)}
-                onChange={(value) =>
-                  onDraftChange({
-                    start: selection.start,
-                    end: Math.max(value, selection.start + 0.5),
-                  })
-                }
-              />
-            </div>
-
-            <div className="mt-4 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 p-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-              <div className="flex items-center justify-between">
-                <span>Chosen range</span>
-                <span className="font-mono text-zinc-200">
-                  {formatTime(selection.start)} to {formatTime(selection.end)}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span>Duration</span>
-                <span className="font-mono text-zinc-200">
-                  {formatTime(Math.max(selection.end - selection.start, 0))}
-                </span>
               </div>
             </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={onSaveDraft}
-                disabled={!hasValidSelection || saving}
-                className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                <span className="crt-action__label" data-text="SAVE RANGE">
-                  SAVE RANGE
-                </span>
-              </button>
-              <button
-                onClick={onCommit}
-                disabled={!hasValidSelection || committing}
-                className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {committing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Scissors className="h-3.5 w-3.5" />
-                )}
-                <span className="crt-action__label" data-text="TRIM AND DISCARD FULL VIDEO">
-                  TRIM AND DISCARD FULL VIDEO
-                </span>
-              </button>
-            </div>
-
-            <p className="mt-3 font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/40">
-              Saving keeps your chosen timestamps. Trimming creates the final clip file and frees the original download.
-            </p>
-          </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function WaveformPreview({
+function WaveformRangeEditor({
   waveform,
   highlights,
   duration,
   selection,
   onSeek,
+  onChange,
 }: {
   waveform: number[];
   highlights: ClipAnalysis["highlights"];
   duration: number;
   selection: DraftRange;
   onSeek?: (time: number) => void;
+  onChange: (range: DraftRange) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<"start" | "end" | null>(null);
+  const minSelection = 0.5;
+
+  useEffect(() => {
+    function handlePointerMove(event: PointerEvent) {
+      if (!dragStateRef.current || !containerRef.current || !duration) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min((event.clientX - rect.left) / rect.width, 1));
+      const nextTime = ratio * duration;
+
+      if (dragStateRef.current === "start") {
+        onChange({
+          start: Math.min(nextTime, Math.max(selection.end - minSelection, 0)),
+          end: selection.end,
+        });
+      } else {
+        onChange({
+          start: selection.start,
+          end: Math.max(nextTime, selection.start + minSelection),
+        });
+      }
+    }
+
+    function stopDragging() {
+      dragStateRef.current = null;
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+    };
+  }, [duration, onChange, selection.end, selection.start]);
+
   function handleWaveformClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!duration || !onSeek) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -909,18 +918,30 @@ function WaveformPreview({
 
   return (
     <div
+      ref={containerRef}
       className={clsx(
-        "relative overflow-hidden rounded-[20px] border border-[#1affe4]/12 bg-gradient-to-b from-[#08131b] to-[#050c12] px-2 py-5",
+        "relative overflow-hidden rounded-[20px] border border-[#1affe4]/12 bg-gradient-to-b from-[#08131b] to-[#050c12] px-3 py-5",
         onSeek && "cursor-pointer"
       )}
       onClick={handleWaveformClick}
       title={onSeek ? "Click to seek video" : undefined}
     >
-      {/* selection overlay — non-interactive */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">WAVEFORM RANGE</p>
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+            Drag either edge of the pink window to trim.
+          </p>
+        </div>
+        <div className="rounded-full border border-[#ff77c2]/18 bg-[#150913] px-3 py-1 font-retro text-xs tracking-[0.18em] text-[#ffb6dd]">
+          {formatTime(Math.max(selection.end - selection.start, 0))}
+        </div>
+      </div>
+
       <div className="pointer-events-none absolute inset-0">
         {selection.end > selection.start && (
           <div
-            className="absolute inset-y-0 rounded-lg border border-[#ff77c2]/75 bg-[#ff2b9d]/12"
+            className="absolute inset-y-[54px] rounded-lg border border-[#ff77c2]/75 bg-[#ff2b9d]/12"
             style={{
               left: `${duration ? (selection.start / duration) * 100 : 0}%`,
               width: `${duration ? ((selection.end - selection.start) / duration) * 100 : 0}%`,
@@ -929,12 +950,11 @@ function WaveformPreview({
         )}
       </div>
 
-      {/* clickable highlight regions */}
       <div className="absolute inset-0">
         {highlights.map((highlight) => (
           <div
             key={`${highlight.start}-${highlight.end}`}
-            className="absolute inset-y-0 rounded-lg bg-[#1affe4]/10 transition-colors hover:bg-[#1affe4]/20"
+            className="absolute inset-y-[54px] rounded-lg bg-[#1affe4]/10 transition-colors hover:bg-[#1affe4]/20"
             style={{
               left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
               width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
@@ -948,7 +968,6 @@ function WaveformPreview({
         ))}
       </div>
 
-      {/* waveform bars */}
       <div className="pointer-events-none relative flex h-28 items-end gap-[2px]">
         {(waveform.length ? waveform : new Array(80).fill(0.15)).map((bar, index) => (
           <div
@@ -958,37 +977,37 @@ function WaveformPreview({
           />
         ))}
       </div>
-    </div>
-  );
-}
 
-function RangeControl({
-  label,
-  value,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="block">
-      <div className="mb-1 flex items-center justify-between font-retro text-xs tracking-[0.16em] text-[#91fff2]/65">
-        <span>{label.toUpperCase()}</span>
-        <span className="font-mono text-zinc-200">{formatTime(value)}</span>
+      {duration > 0 && selection.end > selection.start ? (
+        <>
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              dragStateRef.current = "start";
+            }}
+            className="absolute inset-y-[54px] z-10 w-4 -translate-x-1/2 cursor-ew-resize rounded-full border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
+            style={{ left: `${(selection.start / duration) * 100}%` }}
+            aria-label="Drag selection start"
+          />
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              dragStateRef.current = "end";
+            }}
+            className="absolute inset-y-[54px] z-10 w-4 -translate-x-1/2 cursor-ew-resize rounded-full border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
+            style={{ left: `${(selection.end / duration) * 100}%` }}
+            aria-label="Drag selection end"
+          />
+        </>
+      ) : null}
+
+      <div className="mt-4 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.14em] text-[#91fff2]/45">
+        <span>0:00</span>
+        <span>{formatTime(duration)}</span>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(max, 1)}
-        step={0.5}
-        value={Math.min(value, Math.max(max, 1))}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[#08131a] accent-[#ff2b9d]"
-      />
-    </label>
+    </div>
   );
 }
 

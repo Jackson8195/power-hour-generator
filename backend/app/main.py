@@ -53,7 +53,7 @@ app.add_middleware(
 # Serve rendered videos as static files
 render_path = Path(settings.render_dir)
 render_path.mkdir(parents=True, exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(render_path.parent)), name="static")
+app.mount("/static", StaticFiles(directory=str(render_path)), name="static")
 
 # Also serve downloaded media for preview playback
 media_path = Path(settings.media_dir)
@@ -76,9 +76,6 @@ async def health_check():
     return {
         "status": "ok",
         "version": "0.1.0",
-        "ffmpeg_path": settings.ffmpeg_path,
-        "youtube_api_configured": bool(settings.youtube_api_key),
-        "openai_api_configured": bool(settings.openai_api_key),
     }
 
 

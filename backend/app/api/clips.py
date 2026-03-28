@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.security import resolve_managed_path, unlink_managed_file
 from app.models.schemas import (
     ClipAnalysisResponse,
     ClipCommitRequest,
@@ -34,7 +35,7 @@ def _clip_output_path(clip_id: int, youtube_id: str) -> Path:
 
 def _remove_media_file(file_path: str) -> None:
     if file_path:
-        Path(file_path).unlink(missing_ok=True)
+        unlink_managed_file(file_path, settings.media_dir)
 
 
 @router.post("/", response_model=ClipResponse)
@@ -152,7 +153,11 @@ async def commit_selection(
     if not clip.file_path:
         raise HTTPException(status_code=400, detail="No source media available for this clip")
 
-    source_file_path = Path(clip.file_path)
+    resolved_source = resolve_managed_path(clip.file_path, settings.media_dir)
+    if not resolved_source or not resolved_source.exists():
+        raise HTTPException(status_code=400, detail="No source media available for this clip")
+
+    source_file_path = resolved_source
     output_path = _clip_output_path(clip.id, clip.youtube_id)
 
     await extract_clip_segment(

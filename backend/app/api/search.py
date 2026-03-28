@@ -10,6 +10,7 @@ from app.models.schemas import ProjectDB, SearchQuery, SearchResult
 from app.services.youtube import recommend_for_project, search_youtube
 
 router = APIRouter(prefix="/api/search", tags=["search"])
+SEARCH_FAILURE_MESSAGE = "Search failed. Please try again."
 
 
 @router.post("/youtube", response_model=list[SearchResult])
@@ -34,7 +35,7 @@ async def search(query: SearchQuery, db: AsyncSession = Depends(get_db)):
         )
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=SEARCH_FAILURE_MESSAGE) from e
 
 
 @router.get("/recommendations/{project_id}", response_model=list[SearchResult])
@@ -56,4 +57,4 @@ async def recommendations(
     try:
         return await recommend_for_project(project.clips, max_results=max_results)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=SEARCH_FAILURE_MESSAGE) from e
