@@ -10,9 +10,8 @@ aiosqlite>=0.20.0
 # YouTube/Video
 yt-dlp
 
-# Audio analysis
-librosa>=0.10.2
-soundfile>=0.12.1
+# Audio analysis — librosa & soundfile installed via conda, not pip
+# Run: conda install librosa -c conda-forge
 numpy>=1.26.4
 
 # Casting

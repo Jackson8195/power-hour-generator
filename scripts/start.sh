@@ -32,7 +32,7 @@ echo "Checking prerequisites..."
 check_command python3 "Install Python 3.10+ from https://python.org"
 check_command node "Install Node.js 18+ from https://nodejs.org"
 check_command npm "Comes with Node.js"
-check_command ffmpeg "Install via: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"
+check_command ffmpeg "Download from https://evermeet.cx/ffmpeg/ and place in /usr/local/bin/"
 
 # Check for yt-dlp (warn but don't fail)
 if ! command -v yt-dlp &> /dev/null; then
@@ -41,19 +41,37 @@ fi
 
 echo ""
 
-# ─── Set up Python virtual environment ────────────────────
+# ─── Set up Python (conda) ───────────────────────────────
 
 cd "$PROJECT_DIR"
 
-if [ ! -d "venv" ]; then
-    echo -e "${CYAN}Creating Python virtual environment...${NC}"
-    python3 -m venv venv
+CONDA_ENV_NAME="powerhour"
+
+# Find conda
+if command -v conda &> /dev/null; then
+    echo -e "${GREEN}✓${NC} conda found"
+else
+    echo -e "${RED}✗ conda not found. Install miniforge or anaconda first.${NC}"
+    exit 1
 fi
 
-source venv/bin/activate
-echo -e "${GREEN}✓${NC} Virtual environment activated"
+# Initialize conda for this shell session
+eval "$(conda shell.bash hook)"
 
-# Install/update Python deps
+# Create env if it doesn't exist
+if ! conda env list | grep -q "^${CONDA_ENV_NAME} "; then
+    echo -e "${CYAN}Creating conda environment '${CONDA_ENV_NAME}'...${NC}"
+    conda create -n "$CONDA_ENV_NAME" python=3.12 -y
+    conda activate "$CONDA_ENV_NAME"
+    echo -e "${CYAN}Installing librosa via conda (avoids llvmlite build issues)...${NC}"
+    conda install librosa -c conda-forge -y
+else
+    conda activate "$CONDA_ENV_NAME"
+fi
+
+echo -e "${GREEN}✓${NC} conda env '${CONDA_ENV_NAME}' activated ($(python --version))"
+
+# Install/update pip deps
 echo -e "${CYAN}Installing Python dependencies...${NC}"
 pip install -q -r requirements.txt
 echo -e "${GREEN}✓${NC} Python dependencies installed"
