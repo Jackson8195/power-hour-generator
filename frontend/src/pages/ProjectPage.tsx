@@ -11,6 +11,7 @@ import {
   GripVertical,
   ChevronDown,
   Scissors,
+  CheckCircle2,
 } from "lucide-react";
 import type {
   Clip,
@@ -567,7 +568,7 @@ function ClipReviewCard({
   }[clip.status];
 
   return (
-    <div className="card overflow-hidden">
+    <div className={clsx("card overflow-hidden", committedClip && "border-l-2 border-l-green-500")}>
       <div className="flex items-center gap-3">
         <div className="flex w-8 shrink-0 items-center justify-center">
           <span className="font-mono text-xs text-zinc-600">{index + 1}</span>
@@ -586,7 +587,15 @@ function ClipReviewCard({
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-zinc-100">{clip.source_title}</p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-medium text-zinc-100">{clip.source_title}</p>
+            {committedClip && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-400">
+                <CheckCircle2 className="h-3 w-3" />
+                Clipped
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
             <span>{clip.source_artist}</span>
             {clip.bpm && <span>· {Math.round(clip.bpm)} BPM</span>}
@@ -596,7 +605,6 @@ function ClipReviewCard({
                 · {formatTime(clip.start_time)} to {formatTime(clip.end_time)}
               </span>
             )}
-            {committedClip && <span>· trimmed clip saved</span>}
           </div>
         </div>
 
