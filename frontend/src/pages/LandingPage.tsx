@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const MENU_ITEMS = [
@@ -9,6 +9,48 @@ const MENU_ITEMS = [
 
 export default function LandingPage() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [titleSweepActive, setTitleSweepActive] = useState(false);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    let sweepResetId: number | undefined;
+    let cancelled = false;
+
+    const queueNextSweep = () => {
+      const delay = 2200 + Math.random() * 4200;
+
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setTitleSweepActive(true);
+
+        sweepResetId = window.setTimeout(() => {
+          if (cancelled) {
+            return;
+          }
+
+          setTitleSweepActive(false);
+          queueNextSweep();
+        }, 950);
+      }, delay);
+    };
+
+    queueNextSweep();
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      if (sweepResetId) {
+        window.clearTimeout(sweepResetId);
+      }
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0a0a] scanlines">
@@ -18,12 +60,15 @@ export default function LandingPage() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-12 px-6">
         {/* Title block */}
         <div className="text-center">
-          <h1
-            className="font-retro tracking-widest glow-text text-6xl sm:text-7xl lg:text-8xl"
-            style={{ color: "#ff2b9d" }}
-          >
-            POWER HOUR STUDIO
-          </h1>
+          <div className={`crt-title ${titleSweepActive ? "crt-title--sweeping" : ""}`}>
+            <h1
+              className="crt-title__text font-retro tracking-widest glow-text text-6xl sm:text-7xl lg:text-8xl"
+              data-text="POWER HOUR STUDIO"
+              style={{ color: "#ff2b9d" }}
+            >
+              POWER HOUR STUDIO
+            </h1>
+          </div>
         </div>
 
         {/* DVD-menu navigation panel */}
@@ -55,7 +100,7 @@ export default function LandingPage() {
                 to={item.to}
                 onFocus={() => setHoveredIndex(i)}
                 onBlur={() => setHoveredIndex(null)}
-                className="relative flex items-center gap-4 px-5 py-2.5 font-retro text-xl tracking-wider transition-colors duration-100"
+                className="crt-action relative flex items-center gap-4 px-5 py-2.5 font-retro text-xl tracking-wider transition-colors duration-100"
                 style={{
                   color: hoveredIndex === i ? "#ff2b9d" : "#1affe4",
                   textShadow:
@@ -70,7 +115,9 @@ export default function LandingPage() {
                 >
                   ▶
                 </span>
-                {item.label}
+                <span className="crt-action__label" data-text={item.label}>
+                  {item.label}
+                </span>
               </Link>
             </div>
           ))}
