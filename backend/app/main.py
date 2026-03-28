@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -75,3 +76,9 @@ async def health_check():
         "ffmpeg_path": settings.ffmpeg_path,
         "youtube_api_configured": bool(settings.youtube_api_key),
     }
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Redirect the backend root to the interactive docs."""
+    return RedirectResponse(url="/docs")

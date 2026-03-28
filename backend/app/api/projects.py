@@ -1,10 +1,13 @@
 """Project CRUD endpoints."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.clip_utils import remove_clip_analysis, serialize_clip
 from app.core.database import get_db
 from app.models.schemas import (
     ProjectDB, ClipDB, ProjectCreate, ProjectResponse, ProjectDetail,
@@ -65,7 +68,7 @@ async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Project not found")
 
     detail = ProjectDetail.model_validate(project)
-    detail.clips = sorted(detail.clips, key=lambda c: c.position)
+    detail.clips = [serialize_clip(clip) for clip in sorted(project.clips, key=lambda c: c.position)]
     detail.clip_count = len(detail.clips)
     return detail
 
@@ -73,11 +76,20 @@ async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
 @router.delete("/{project_id}")
 async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a project and all its clips."""
-    result = await db.execute(select(ProjectDB).where(ProjectDB.id == project_id))
+    result = await db.execute(
+        select(ProjectDB)
+        .options(selectinload(ProjectDB.clips))
+        .where(ProjectDB.id == project_id)
+    )
     project = result.scalar_one_or_none()
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    for clip in project.clips:
+        if clip.file_path:
+            Path(clip.file_path).unlink(missing_ok=True)
+        remove_clip_analysis(clip.id)
 
     await db.delete(project)
     return {"status": "deleted", "project_id": project_id}

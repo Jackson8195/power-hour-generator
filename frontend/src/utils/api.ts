@@ -3,6 +3,7 @@ import type {
   Project,
   ProjectDetail,
   Clip,
+  ClipAnalysis,
   RenderProgress,
   CastDevice,
 } from "./types";
@@ -25,12 +26,24 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export async function searchYouTube(
   query: string,
-  maxResults = 10
+  maxResults = 10,
+  projectId?: number
 ): Promise<SearchResult[]> {
   return request("/api/search/youtube", {
     method: "POST",
-    body: JSON.stringify({ query, max_results: maxResults }),
+    body: JSON.stringify({
+      query,
+      max_results: maxResults,
+      project_id: projectId,
+    }),
   });
+}
+
+export async function getRecommendedTracks(
+  projectId: number,
+  maxResults = 8
+): Promise<SearchResult[]> {
+  return request(`/api/search/recommendations/${projectId}?max_results=${maxResults}`);
 }
 
 // ─── Projects ────────────────────────────────────────────
@@ -104,6 +117,20 @@ export async function reorderClips(
 
 export async function useSuggestedSegment(clipId: number): Promise<Clip> {
   return request(`/api/clips/${clipId}/use-suggestion`, { method: "POST" });
+}
+
+export async function getClipAnalysis(clipId: number): Promise<ClipAnalysis> {
+  return request(`/api/clips/${clipId}/analysis`);
+}
+
+export async function commitClipSelection(
+  clipId: number,
+  data: { start_time: number; end_time: number }
+): Promise<Clip> {
+  return request(`/api/clips/${clipId}/commit`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 // ─── Downloads ───────────────────────────────────────────

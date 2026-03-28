@@ -1,12 +1,14 @@
 # 🍺 Power Hour Studio
 
-A local web application for creating Power Hour videos — the drinking game where you watch 60 one-minute music video clips with transitions between each.
+A local web application for creating Power Hour videos from music video clips, with search, review, trimming, ordering, and final rendering in one place.
 
 ## Features
 
 - **Song Discovery** — Search YouTube for music videos, browse by genre/decade
-- **Smart Clip Selection** — Audio analysis finds the best 60-second segment (chorus/drop detection)
-- **Visual Timeline Editor** — Drag-and-drop clip ordering with waveform previews
+- **Recommended Clip Review** — Audio analysis suggests likely chorus/high-energy sections without auto-picking the final range
+- **Waveform-Guided Selection** — Review a preview player, waveform/equalizer bars, and highlighted recommended regions before trimming
+- **Flexible Clip Lengths** — Users choose the exact start/end range; clips do not have to be exactly 60 seconds
+- **Timeline Editing** — Arrange saved clips into the final Power Hour sequence
 - **Video Rendering** — FFmpeg-powered concatenation with transitions and countdown overlays
 - **TV Casting** — Cast to Chromecast, AirPlay, or DLNA devices on your network
 - **Project Management** — Save, load, and share Power Hour playlists
@@ -37,7 +39,7 @@ A local web application for creating Power Hour videos — the drinking game whe
 ## Prerequisites
 
 - **Python 3.10+** (3.11 recommended)
-- **Node.js 18+** and npm
+- **Node.js 18+** and npm (`.nvmrc` pins Node 20 for this project)
 - **FFmpeg** — installed and on your PATH
 - **yt-dlp** — installed via pip or standalone
 
@@ -72,6 +74,7 @@ pip install -r requirements.txt
 ### 2. Install frontend
 
 ```bash
+nvm use  # or: nvm install
 cd frontend
 npm install
 cd ..
@@ -98,6 +101,20 @@ npm run dev
 
 Open **http://localhost:5173** in your browser.
 
+## Clip Workflow
+
+1. Search YouTube and add a track to a project.
+2. The backend downloads the source video and analyzes the audio.
+3. The app shows:
+   - a preview player
+   - waveform/equalizer bars
+   - highlighted recommended sections
+   - editable start and end controls
+4. Save a draft range when you like the selection.
+5. Use **Trim and discard full video** to create the final clip file and free disk space.
+
+The recommendation system is intentionally advisory: it points you toward likely chorus or high-energy sections, but the user makes the final choice.
+
 ## Project Structure
 
 ```
@@ -107,8 +124,9 @@ power-hour-studio/
 │   │   ├── main.py              # FastAPI app entry
 │   │   ├── api/
 │   │   │   ├── search.py        # YouTube/Spotify search endpoints
-│   │   │   ├── downloads.py     # yt-dlp download management
-│   │   │   ├── clips.py         # Clip CRUD + audio analysis
+│   │   │   ├── downloads.py     # yt-dlp download + analysis kickoff
+│   │   │   ├── clips.py         # Clip review, draft selection, commit trim
+│   │   │   ├── clip_utils.py    # Clip response + analysis sidecar helpers
 │   │   │   ├── projects.py      # Project management
 │   │   │   ├── render.py        # Render pipeline endpoints
 │   │   │   └── cast.py          # Casting/playback endpoints
@@ -119,8 +137,8 @@ power-hour-studio/
 │   │   │   └── schemas.py       # Pydantic models
 │   │   └── services/
 │   │       ├── youtube.py       # YouTube Data API + yt-dlp
-│   │       ├── audio_analysis.py# librosa beat/chorus detection
-│   │       ├── ffmpeg.py        # FFmpeg render pipeline
+│   │       ├── audio_analysis.py# waveform + recommendation analysis
+│   │       ├── ffmpeg.py        # FFmpeg trim + render pipeline
 │   │       └── casting.py       # Chromecast/DLNA discovery
 │   └── static/                  # Rendered videos served here
 ├── frontend/
@@ -144,6 +162,14 @@ power-hour-studio/
 ## API Documentation
 
 Once running, visit **http://localhost:8000/docs** for the interactive Swagger UI.
+
+## Storage Notes
+
+- Project data persists in `backend/power_hour.db`
+- Review-stage source downloads are stored in `backend/media`
+- Final committed trimmed clips are stored in `backend/media/clips`
+- Analysis sidecars are stored in `backend/media/analysis`
+- Final renders are stored in `backend/static/renders`
 
 ## License
 

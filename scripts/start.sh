@@ -6,6 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+NVMRC_PATH="$PROJECT_DIR/.nvmrc"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -28,11 +29,84 @@ check_command() {
     echo -e "${GREEN}✓${NC} $1 found"
 }
 
+load_nvm() {
+    if command -v nvm &> /dev/null; then
+        return 0
+    fi
+
+    if [ -s "$HOME/.nvm/nvm.sh" ]; then
+        # shellcheck disable=SC1090
+        source "$HOME/.nvm/nvm.sh"
+        return 0
+    fi
+
+    return 1
+}
+
+ensure_project_node() {
+    if [ ! -f "$NVMRC_PATH" ]; then
+        return 0
+    fi
+
+    local desired_node
+    desired_node="$(tr -d '[:space:]' < "$NVMRC_PATH")"
+    if [ -z "$desired_node" ]; then
+        return 0
+    fi
+
+    if ! load_nvm; then
+        echo -e "${YELLOW}⚠ nvm not found in this shell. Using whatever Node is already on PATH.${NC}"
+        return 0
+    fi
+
+    if ! nvm use "$desired_node" >/dev/null 2>&1; then
+        echo -e "${CYAN}Installing Node.js ${desired_node} via nvm for this project...${NC}"
+        nvm install "$desired_node"
+        nvm use "$desired_node" >/dev/null
+    fi
+
+    echo -e "${GREEN}✓${NC} Using Node.js $(node -v) from .nvmrc"
+}
+
+check_node_runtime() {
+    local node_output
+    if ! node_output=$(node -v 2>&1); then
+        echo -e "${RED}✗ node is installed but could not start.${NC}"
+        echo "$node_output"
+        echo -e "${YELLOW}This usually means the selected Node binary is incompatible with your macOS version.${NC}"
+        echo -e "${YELLOW}Switch to a compatible Node version (Node 20 LTS is a safe choice) and try again.${NC}"
+        exit 1
+    fi
+
+    local node_major="${node_output#v}"
+    node_major="${node_major%%.*}"
+    if [ "$node_major" -lt 18 ]; then
+        echo -e "${RED}✗ Node.js ${node_output} is too old for this frontend.${NC}"
+        echo -e "${YELLOW}Vite 5 requires Node.js 18+.${NC} Install or switch to Node 20 LTS and rerun the script."
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓${NC} node runtime OK (${node_output})"
+}
+
+check_npm_runtime() {
+    local npm_output
+    if ! npm_output=$(npm -v 2>&1); then
+        echo -e "${RED}✗ npm is installed but could not start.${NC}"
+        echo "$npm_output"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} npm runtime OK (${npm_output})"
+}
+
 echo "Checking prerequisites..."
+ensure_project_node
 check_command python3 "Install Python 3.10+ from https://python.org"
 check_command node "Install Node.js 18+ from https://nodejs.org"
 check_command npm "Comes with Node.js"
 check_command ffmpeg "Download from https://evermeet.cx/ffmpeg/ and place in /usr/local/bin/"
+check_node_runtime
+check_npm_runtime
 
 # Check for yt-dlp (warn but don't fail)
 if ! command -v yt-dlp &> /dev/null; then

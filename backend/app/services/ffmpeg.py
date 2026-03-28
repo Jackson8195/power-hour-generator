@@ -1,12 +1,11 @@
 """FFmpeg-based video rendering pipeline.
 
-Handles clip normalization, transitions, countdown overlays,
+Handles clip extraction, normalization, transitions, countdown overlays,
 and final concatenation into a Power Hour video.
 """
 
 import asyncio
 import logging
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional
@@ -14,6 +13,46 @@ from typing import Callable, Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def extract_clip_segment(
+    source_path: str,
+    output_path: str,
+    start_time: float,
+    end_time: float,
+) -> str:
+    """Create a standalone clip file from a source video."""
+    duration = max(end_time - start_time, 0.1)
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        settings.ffmpeg_path,
+        "-y",
+        "-ss", str(start_time),
+        "-i", source_path,
+        "-t", str(duration),
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        str(output),
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error(f"FFmpeg clip extraction failed: {stderr.decode()[-500:]}")
+        raise RuntimeError(f"Failed to extract clip from {source_path}")
+
+    return str(output)
 
 
 class RenderPipeline:

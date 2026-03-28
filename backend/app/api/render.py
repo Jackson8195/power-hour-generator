@@ -40,9 +40,12 @@ async def start_render(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    ready_clips = [c for c in project.clips if c.status == ClipStatus.READY]
+    ready_clips = [
+        c for c in project.clips
+        if c.status == ClipStatus.READY and c.file_path and c.end_time > c.start_time
+    ]
     if not ready_clips:
-        raise HTTPException(status_code=400, detail="No ready clips to render")
+        raise HTTPException(status_code=400, detail="No reviewed clips with a selected range to render")
 
     ready_clips.sort(key=lambda c: c.position)
 

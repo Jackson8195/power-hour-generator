@@ -5,6 +5,8 @@ export interface SearchResult {
   thumbnail: string;
   duration: string;
   view_count: string;
+  match_score: number;
+  recommendation_reason: string;
 }
 
 export type ClipStatus = "pending" | "downloading" | "analyzing" | "ready" | "error";
@@ -26,6 +28,8 @@ export interface Clip {
   bpm: number | null;
   energy: number | null;
   status: ClipStatus;
+  preview_url: string;
+  has_selection: boolean;
 }
 
 export interface Project {
@@ -56,4 +60,21 @@ export interface CastDevice {
   name: string;
   type: string;
   model: string;
+}
+
+export interface ClipHighlight {
+  start: number;
+  end: number;
+  score: number;
+  label: string;
+}
+
+export interface ClipAnalysis {
+  clip_id: number;
+  preview_url: string;
+  duration: number;
+  suggested_start: number;
+  suggested_end: number;
+  waveform: number[];
+  highlights: ClipHighlight[];
 }

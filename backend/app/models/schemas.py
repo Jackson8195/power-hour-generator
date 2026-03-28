@@ -59,7 +59,7 @@ class ClipDB(Base):
 
     # Local file
     file_path = Column(String(500), default="")
-    duration = Column(Float, default=0.0)  # Total duration of source
+    duration = Column(Float, default=0.0)  # Duration of the current local media file
 
     # Clip selection (which 60s segment to use)
     start_time = Column(Float, default=0.0)
@@ -99,6 +99,7 @@ class RenderDB(Base):
 class SearchQuery(BaseModel):
     query: str = Field(..., min_length=1, max_length=200)
     max_results: int = Field(default=10, ge=1, le=50)
+    project_id: Optional[int] = None
 
 
 class SearchResult(BaseModel):
@@ -108,6 +109,8 @@ class SearchResult(BaseModel):
     thumbnail: str
     duration: str = ""
     view_count: str = ""
+    match_score: float = 0.0
+    recommendation_reason: str = ""
 
 
 class ClipCreate(BaseModel):
@@ -141,6 +144,8 @@ class ClipResponse(BaseModel):
     bpm: Optional[float]
     energy: Optional[float]
     status: ClipStatus
+    preview_url: str = ""
+    has_selection: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -181,3 +186,25 @@ class RenderProgress(BaseModel):
     progress: float
     output_path: str = ""
     error_message: str = ""
+
+
+class ClipHighlight(BaseModel):
+    start: float
+    end: float
+    score: float
+    label: str
+
+
+class ClipAnalysisResponse(BaseModel):
+    clip_id: int
+    preview_url: str = ""
+    duration: float = 0.0
+    suggested_start: float = 0.0
+    suggested_end: float = 0.0
+    waveform: list[float] = []
+    highlights: list[ClipHighlight] = []
+
+
+class ClipCommitRequest(BaseModel):
+    start_time: float = Field(..., ge=0)
+    end_time: float = Field(..., gt=0)
