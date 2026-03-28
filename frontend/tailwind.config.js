@@ -22,6 +22,7 @@ export default {
         sans: ['"DM Sans"', "system-ui", "sans-serif"],
         mono: ['"Space Mono"', "monospace"],
         retro: ['"VT323"', '"Space Mono"', "monospace"],
+        marker: ['"Permanent Marker"', "cursive"],
       },
       keyframes: {
         "crt-flicker": {

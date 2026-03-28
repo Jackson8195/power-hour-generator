@@ -9,6 +9,26 @@
 }
 
 @layer components {
+  /* CD binder sleeve pocket */
+  .cd-sleeve {
+    background: rgba(160, 180, 220, 0.07);
+    border: 1px solid rgba(200, 220, 255, 0.15);
+    border-radius: 6px;
+    padding: 10px;
+    position: relative;
+  }
+  .cd-sleeve::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(200, 220, 255, 0.12);
+    border-radius: 6px 6px 0 0;
+  }
+
   .scanlines::before {
     content: '';
     position: fixed;

@@ -6,19 +6,17 @@ import clsx from "clsx";
 
 const ITEMS_PER_PAGE = 4;
 
-const DISC_COLORS = [
-  "#c0392b", // red
-  "#d35400", // orange
-  "#f39c12", // amber
-  "#27ae60", // green
-  "#2980b9", // blue
-  "#8e44ad", // purple
-  "#e91e8c", // pink
-  "#1a5276", // navy
-];
+const CD_GRADIENT = [
+  "radial-gradient(circle at 30% 25%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.05) 28%, transparent 48%)",
+  "radial-gradient(circle at 50% 50%, rgba(210,210,225,0.5) 0%, rgba(170,170,190,0.15) 45%, transparent 68%)",
+  "conic-gradient(from 200deg, #adadb8, #cfc060, #e085b0, #85a8e0, #85e0b8, #b885e0, #e09085, #adadb8, #cfc060, #adadb8)",
+].join(", ");
 
-function discColor(id: number): string {
-  return DISC_COLORS[id % DISC_COLORS.length];
+function splitName(name: string): [string, string | null] {
+  if (name.length <= 13) return [name, null];
+  const mid = name.lastIndexOf(" ", 13);
+  if (mid <= 0) return [name.slice(0, 12) + "…", null];
+  return [name.slice(0, mid), name.slice(mid + 1)];
 }
 
 export default function MixtapeBinderPage() {
@@ -70,9 +68,9 @@ export default function MixtapeBinderPage() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 flex flex-1 items-center justify-center px-8 py-12">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-8 sm:px-8 sm:py-12">
         {loading ? (
-          <p className="font-retro text-2xl tracking-widest text-zinc-500 animate-pulse">
+          <p className="animate-pulse font-retro text-2xl tracking-widest text-zinc-500">
             LOADING...
           </p>
         ) : projects.length === 0 ? (
@@ -83,27 +81,54 @@ export default function MixtapeBinderPage() {
             </p>
             <button
               onClick={() => navigate("/create")}
-              className="mt-8 font-retro text-xl tracking-widest text-brand-400 transition-colors hover:glow-text hover:text-brand-300"
+              className="mt-8 font-retro text-xl tracking-widest text-brand-400 transition-colors hover:text-brand-300"
             >
               ▶ CREATE NEW
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-10 sm:gap-14" style={{ maxWidth: "520px", width: "100%" }}>
-            {pageItems.map((project) => (
-              <DiscSlot
-                key={project.id}
-                project={project}
-                isAnimating={animatingId === project.id}
-                isDimmed={animatingId !== null && animatingId !== project.id}
-                onClick={() => handleDiscClick(project.id)}
-              />
-            ))}
-            {/* Fill empty slots so grid stays stable */}
-            {pageItems.length < ITEMS_PER_PAGE &&
-              Array.from({ length: ITEMS_PER_PAGE - pageItems.length }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square opacity-0" />
+          /* Binder container */
+          <div
+            style={{
+              position: "relative",
+              background: "linear-gradient(135deg, #1c1c2e 0%, #0f0f1a 100%)",
+              boxShadow: "inset 0 0 60px rgba(0,0,0,0.6), 0 12px 40px rgba(0,0,0,0.8)",
+              border: "1px solid #2a2a3a",
+              borderRadius: "10px",
+              padding: "20px 16px",
+              maxWidth: "480px",
+              width: "100%",
+            }}
+          >
+            {/* Binder spine divider */}
+            <div
+              style={{
+                position: "absolute",
+                top: "6%",
+                bottom: "6%",
+                left: "50%",
+                width: "2px",
+                background:
+                  "linear-gradient(to bottom, transparent, #2a2a3a 20%, #3a3a4a 50%, #2a2a3a 80%, transparent)",
+                transform: "translateX(-50%)",
+              }}
+            />
+
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {pageItems.map((project) => (
+                <DiscSlot
+                  key={project.id}
+                  project={project}
+                  isAnimating={animatingId === project.id}
+                  isDimmed={animatingId !== null && animatingId !== project.id}
+                  onClick={() => handleDiscClick(project.id)}
+                />
               ))}
+              {pageItems.length < ITEMS_PER_PAGE &&
+                Array.from({ length: ITEMS_PER_PAGE - pageItems.length }).map((_, i) => (
+                  <div key={`empty-${i}`} className="cd-sleeve opacity-0" />
+                ))}
+            </div>
           </div>
         )}
       </main>
@@ -116,9 +141,7 @@ export default function MixtapeBinderPage() {
             disabled={page === 0}
             className={clsx(
               "font-retro text-2xl tracking-widest transition-colors",
-              page === 0
-                ? "cursor-not-allowed text-zinc-700"
-                : "text-zinc-400 hover:text-zinc-200"
+              page === 0 ? "cursor-not-allowed text-zinc-700" : "text-zinc-400 hover:text-zinc-200"
             )}
           >
             ◀ PREV
@@ -141,24 +164,32 @@ export default function MixtapeBinderPage() {
         </footer>
       )}
 
-      {/* Loading overlay during disc-drop animation */}
+      {/* Loading overlay */}
       {animatingId !== null && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/70">
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/75">
           <div
             className="animate-disc-spin rounded-full"
             style={{
-              width: 80,
-              height: 80,
-              backgroundColor: discColor(animatingId),
-              boxShadow: `0 0 30px ${discColor(animatingId)}`,
+              width: 88,
+              height: 88,
+              background: CD_GRADIENT,
+              boxShadow: "0 0 30px rgba(200,200,255,0.4), 0 0 60px rgba(160,160,220,0.2)",
             }}
           >
+            {/* spindle hole */}
             <div
-              className="absolute inset-0 m-auto rounded-full bg-[#0a0a0a]"
-              style={{ width: "20%", height: "20%", top: "40%", left: "40%" }}
+              style={{
+                position: "absolute",
+                width: "14%",
+                height: "14%",
+                top: "43%",
+                left: "43%",
+                borderRadius: "50%",
+                background: "#07070e",
+              }}
             />
           </div>
-          <p className="mt-6 font-retro text-2xl tracking-widest text-zinc-300 animate-pulse">
+          <p className="mt-6 animate-pulse font-retro text-2xl tracking-widest text-zinc-300">
             LOADING DISC...
           </p>
         </div>
@@ -178,75 +209,103 @@ function DiscSlot({
   isDimmed: boolean;
   onClick: () => void;
 }) {
-  const color = discColor(project.id);
+  const [line1, line2] = splitName(project.name);
 
   return (
     <button
       onClick={onClick}
       className={clsx(
-        "group flex flex-col items-center gap-3 transition-all duration-200",
-        isDimmed && "pointer-events-none opacity-25",
+        "group flex flex-col items-center gap-1.5 transition-all duration-200",
+        isDimmed && "pointer-events-none opacity-20",
         isAnimating && "animate-disc-drop"
       )}
     >
-      {/* Disc circle */}
-      <div
-        className="relative w-full rounded-full"
-        style={{
-          aspectRatio: "1 / 1",
-          backgroundColor: color,
-          boxShadow: `inset 0 0 24px rgba(0,0,0,0.55), 0 0 18px ${color}55`,
-          transition: "box-shadow 0.2s",
-        }}
-      >
-        {/* Sheen ring */}
+      {/* Sleeve pocket */}
+      <div className="cd-sleeve w-full">
+        {/* Disc */}
         <div
-          className="absolute inset-[8%] rounded-full opacity-20"
+          className="relative w-full rounded-full transition-all duration-200 group-hover:brightness-110"
           style={{
-            background: "radial-gradient(circle at 35% 35%, white 0%, transparent 70%)",
+            aspectRatio: "1 / 1",
+            background: CD_GRADIENT,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)",
           }}
-        />
-        {/* Disc label area */}
-        <div
-          className="absolute inset-[22%] flex items-center justify-center rounded-full"
-          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
         >
-          <span
-            className="max-w-[80%] overflow-hidden text-ellipsis whitespace-nowrap font-retro text-xs tracking-wide text-white/80"
-            style={{ fontSize: "clamp(0.55rem, 2vw, 0.8rem)" }}
+          {/* Hub ring — darker circle behind the label area */}
+          <div
+            style={{
+              position: "absolute",
+              inset: "28%",
+              borderRadius: "50%",
+              background: "rgba(0,0,0,0.22)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          />
+
+          {/* Sharpie text area */}
+          <div
+            style={{
+              position: "absolute",
+              inset: "28%",
+              borderRadius: "50%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "6%",
+            }}
           >
-            {project.name.toUpperCase()}
-          </span>
+            <span
+              className="font-marker leading-tight text-[#111]"
+              style={{
+                fontSize: "clamp(0.45rem, 2.2vw, 0.72rem)",
+                transform: "rotate(-4deg)",
+                display: "block",
+                textAlign: "center",
+                maxWidth: "100%",
+                wordBreak: "break-word",
+                lineHeight: 1.2,
+              }}
+            >
+              {line1}
+            </span>
+            {line2 && (
+              <span
+                className="font-marker leading-tight text-[#111]"
+                style={{
+                  fontSize: "clamp(0.45rem, 2.2vw, 0.72rem)",
+                  transform: "rotate(-4deg)",
+                  display: "block",
+                  textAlign: "center",
+                  maxWidth: "100%",
+                  wordBreak: "break-word",
+                  lineHeight: 1.2,
+                }}
+              >
+                {line2}
+              </span>
+            )}
+          </div>
+
+          {/* Spindle hole */}
+          <div
+            style={{
+              position: "absolute",
+              width: "7%",
+              height: "7%",
+              top: "46.5%",
+              left: "46.5%",
+              borderRadius: "50%",
+              background: "#07070e",
+            }}
+          />
         </div>
-        {/* Center hole */}
-        <div
-          className="absolute rounded-full bg-[#0a0a0a]"
-          style={{
-            width: "14%",
-            height: "14%",
-            top: "43%",
-            left: "43%",
-          }}
-        />
-        {/* Hover glow */}
-        <div
-          className="absolute inset-0 rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          style={{ boxShadow: `0 0 32px ${color}` }}
-        />
       </div>
 
-      {/* Label below disc */}
-      <div className="text-center">
-        <p
-          className="max-w-[10rem] overflow-hidden text-ellipsis whitespace-nowrap font-retro tracking-widest text-zinc-400 transition-colors group-hover:text-zinc-100"
-          style={{ fontSize: "clamp(0.75rem, 2.5vw, 1rem)" }}
-        >
-          {project.name.toUpperCase()}
-        </p>
-        <p className="font-retro text-xs tracking-widest text-zinc-600">
-          {project.clip_count} CLIPS
-        </p>
-      </div>
+      {/* Clip count below sleeve */}
+      <p className="font-retro text-xs tracking-widest text-zinc-600">
+        {project.clip_count} CLIPS
+      </p>
     </button>
   );
 }
