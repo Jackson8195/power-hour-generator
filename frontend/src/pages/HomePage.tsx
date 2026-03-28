@@ -102,7 +102,7 @@ export default function HomePage() {
                 <div className="relative z-10">
                   <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">FINISHED OUTPUTS</p>
                   <button
-                    onClick={() => navigate("/mixtapes")}
+                    onClick={() => navigate("/power-hours")}
                     className="crt-action retro-button-secondary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
                   >
                     <Sparkles className="h-4 w-4" />
