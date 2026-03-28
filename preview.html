@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Power Hour Studio - Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #e4e4e7; font-family: 'DM Sans', system-ui, sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+    .scanlines::before { content: ''; position: fixed; inset: 0; z-index: 50; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px); }
+
+    @keyframes crt-flicker { 0%, 100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.82; } 94% { opacity: 1; } 96% { opacity: 0.88; } 97% { opacity: 1; } }
+    .crt-flicker { animation: crt-flicker 8s ease-in-out infinite; }
+
+    @keyframes disc-drop { 0% { transform: translateY(-40px) scale(0.85); opacity: 0; } 60% { transform: translateY(6px) scale(1.04); opacity: 1; } 80% { transform: translateY(-3px) scale(0.98); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+    @keyframes disc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes menu-slide { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .retro { font-family: 'VT323', 'Space Mono', monospace; }
+    .marker { font-family: 'Permanent Marker', cursive; }
+
+    .screen { display: none; min-height: 100vh; position: relative; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── LANDING ── */
+    #screen-landing { align-items: center; justify-content: center; background: #0a0a0a; }
+    #screen-landing main { display: flex; flex-direction: column; align-items: center; gap: 3rem; padding: 2rem; text-align: center; }
+    .landing-title { font-size: clamp(2.4rem, 9vw, 5.5rem); letter-spacing: 0.15em; color: #ff2b9d; line-height: 1.1; text-shadow: 0 0 8px #ff2b9d, 0 0 20px #ff2b9d, 0 0 40px #ff2b9d; }
+    .menu-panel { max-width: 360px; width: 100%; border: 1px solid rgba(26,255,228,0.15); background: rgba(0,20,20,0.6); }
+    .menu-item-wrap { position: relative; cursor: pointer; }
+    .menu-highlight { position: absolute; inset: 0; opacity: 0; background: rgba(255,43,157,0.15); border-left: 3px solid #ff2b9d; transition: opacity 0.1s; pointer-events: none; }
+    .menu-item-wrap.hovered .menu-highlight { opacity: 1; }
+    .menu-item { display: flex; align-items: center; gap: 1rem; font-size: 1.4rem; letter-spacing: 0.12em; color: #1affe4; cursor: pointer; padding: 0.6rem 1.25rem; background: none; border: none; text-align: left; transition: color 0.1s; -webkit-tap-highlight-color: transparent; width: 100%; position: relative; }
+    .menu-item-wrap.hovered .menu-item { color: #ff2b9d; text-shadow: 0 0 8px #ff2b9d, 0 0 20px #ff2b9d88; }
+    .menu-item-wrap.hovered .menu-arr { opacity: 1; }
+    .menu-arrow { display: inline-block; width: 1rem; text-align: right; }
+    .menu-arrow-hidden { opacity: 0; display: inline-block; width: 1rem; transition: opacity 0.1s; }
+    .landing-footer { position: absolute; bottom: 0; width: 100%; padding: 1.5rem; text-align: center; font-size: 0.7rem; letter-spacing: 0.25em; color: #0d4040; }
+
+    /* ── BINDER ── */
+    #screen-binder { background: #0a0a0a; }
+    .binder-header { display: flex; align-items: center; gap: 1.5rem; padding: 1.75rem 1.5rem 1rem; position: relative; z-index: 10; }
+    .back-btn { font-size: 1.3rem; letter-spacing: 0.2em; color: #52525b; background: none; border: none; cursor: pointer; transition: color 0.15s; -webkit-tap-highlight-color: transparent; }
+    .back-btn:hover { color: #d4d4d8; }
+    .binder-title { font-size: clamp(1.3rem, 4.5vw, 2rem); letter-spacing: 0.2em; color: #d4d4d8; }
+    .binder-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0.75rem 1rem 1.5rem; position: relative; z-index: 10; }
+
+    /* Binder container */
+    .binder-wrap {
+      position: relative;
+      background: linear-gradient(135deg, #1c1c2e 0%, #0f0f1a 100%);
+      box-shadow: inset 0 0 60px rgba(0,0,0,0.6), 0 12px 40px rgba(0,0,0,0.8);
+      border: 1px solid #2a2a3a;
+      border-radius: 10px;
+      padding: 18px 14px;
+      max-width: 460px;
+      width: 100%;
+    }
+    .binder-spine {
+      position: absolute;
+      top: 6%; bottom: 6%;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: linear-gradient(to bottom, transparent, #2a2a3a 20%, #3a3a4a 50%, #2a2a3a 80%, transparent);
+    }
+    .disc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* CD sleeve pocket */
+    .cd-sleeve {
+      background: rgba(160, 180, 220, 0.07);
+      border: 1px solid rgba(200, 220, 255, 0.15);
+      border-radius: 6px;
+      padding: 9px;
+      position: relative;
+    }
+    .cd-sleeve::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 10px;
+      background: rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(200,220,255,0.12);
+      border-radius: 6px 6px 0 0;
+    }
+
+    /* CD disc */
+    .cd-disc {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      position: relative;
+      transition: filter 0.2s;
+    }
+    .disc-slot:hover .cd-disc { filter: brightness(1.1); }
+    .disc-slot { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; background: none; border: none; -webkit-tap-highlight-color: transparent; transition: opacity 0.2s; }
+    .disc-slot.dimmed { opacity: 0.2; pointer-events: none; }
+    .disc-slot.animating { animation: disc-drop 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+    .cd-hub-ring { position: absolute; inset: 28%; border-radius: 50%; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.1); }
+    .cd-text-top { position: absolute; top: 7%; left: 12%; right: 12%; text-align: center; }
+    .cd-text-bottom { position: absolute; bottom: 7%; left: 12%; right: 12%; text-align: center; }
+    .cd-sharpie-top { font-family: 'Permanent Marker', cursive; color: #111; font-size: clamp(0.42rem, 2vw, 0.65rem); transform: rotate(-3deg); display: block; line-height: 1.1; }
+    .cd-sharpie-bottom { font-family: 'Permanent Marker', cursive; color: #111; font-size: clamp(0.42rem, 2vw, 0.65rem); transform: rotate(3deg); display: block; line-height: 1.1; }
+    .cd-hole { position: absolute; width: 7%; height: 7%; top: 46.5%; left: 46.5%; border-radius: 50%; background: #07070e; }
+    .disc-clips { font-family: 'VT323', monospace; font-size: 0.8rem; letter-spacing: 0.15em; color: #3f3f46; }
+
+    .binder-footer { display: flex; align-items: center; justify-content: center; gap: 2rem; padding: 1rem 1.5rem 2rem; position: relative; z-index: 10; }
+    .page-btn { font-family: 'VT323', monospace; font-size: 1.5rem; letter-spacing: 0.18em; color: #a1a1aa; background: none; border: none; cursor: pointer; transition: color 0.15s; -webkit-tap-highlight-color: transparent; }
+    .page-btn:disabled { color: #3f3f46; cursor: default; }
+    .page-btn:not(:disabled):hover { color: #f4f4f5; }
+    .page-label { font-family: 'VT323', monospace; font-size: 1.3rem; letter-spacing: 0.2em; color: #52525b; }
+
+    /* Loading overlay */
+    .loading-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; }
+    .loading-disc { width: 88px; height: 88px; border-radius: 50%; animation: disc-spin 2s linear infinite; position: relative; box-shadow: 0 0 30px rgba(200,200,255,0.4), 0 0 60px rgba(160,160,220,0.2); }
+    .loading-disc-hole { position: absolute; width: 14%; height: 14%; top: 43%; left: 43%; border-radius: 50%; background: #07070e; }
+    .loading-text { font-family: 'VT323', monospace; font-size: 1.8rem; letter-spacing: 0.25em; color: #d4d4d8; animation: pulse 1.2s ease-in-out infinite; }
+
+    /* ── AUTO GENERATE ── */
+    #screen-autogen { align-items: center; justify-content: center; background: #0a0a0a; }
+    .autogen-content { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; position: relative; z-index: 10; }
+    .autogen-title { font-size: clamp(2.2rem, 8vw, 4rem); letter-spacing: 0.18em; color: #f09333; text-shadow: 0 0 8px #f09333, 0 0 24px #f0933366; }
+    .autogen-sub { font-size: clamp(1.2rem, 4vw, 1.6rem); letter-spacing: 0.2em; color: #71717a; animation: pulse 2s ease-in-out infinite; }
+    .autogen-soon { font-size: 0.9rem; letter-spacing: 0.25em; color: #3f3f46; }
+    .autogen-back { position: absolute; bottom: 2.5rem; font-size: 1.3rem; letter-spacing: 0.2em; color: #52525b; background: none; border: none; cursor: pointer; transition: color 0.15s; -webkit-tap-highlight-color: transparent; }
+    .autogen-back:hover { color: #d4d4d8; }
+
+    .preview-badge { position: fixed; top: 0.75rem; right: 0.75rem; z-index: 200; background: rgba(237,122,14,0.15); border: 1px solid rgba(237,122,14,0.3); border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.65rem; letter-spacing: 0.1em; color: #ed7a0e; font-family: 'Space Mono', monospace; }
+  </style>
+</head>
+<body>
+<div class="preview-badge">PREVIEW</div>
+
+<!-- LANDING -->
+<div id="screen-landing" class="screen active scanlines">
+  <div class="crt-flicker" style="position:fixed;inset:0;pointer-events:none;background:transparent;"></div>
+  <main>
+    <div>
+      <h1 class="retro landing-title">POWER HOUR STUDIO</h1>
+    </div>
+    <nav class="menu-panel" role="menu">
+      <div class="menu-item-wrap" onmouseenter="this.classList.add('hovered')" onmouseleave="this.classList.remove('hovered')">
+        <div class="menu-highlight"></div>
+        <button class="retro menu-item" onclick="showBinder()"><span class="menu-arrow-hidden menu-arr">&#9658;</span>INSERT MIXTAPE</button>
+      </div>
+      <div class="menu-item-wrap" onmouseenter="this.classList.add('hovered')" onmouseleave="this.classList.remove('hovered')">
+        <div class="menu-highlight"></div>
+        <button class="retro menu-item" onclick="showCreate()"><span class="menu-arrow-hidden menu-arr">&#9658;</span>CREATE NEW</button>
+      </div>
+      <div class="menu-item-wrap" onmouseenter="this.classList.add('hovered')" onmouseleave="this.classList.remove('hovered')">
+        <div class="menu-highlight"></div>
+        <button class="retro menu-item" onclick="showAutoGen()"><span class="menu-arrow-hidden menu-arr">&#9658;</span>AUTO GENERATE</button>
+      </div>
+    </nav>
+  </main>
+  <footer class="retro landing-footer">&#169; POWER HOUR STUDIOS - EST. 2024</footer>
+</div>
+
+<!-- BINDER -->
+<div id="screen-binder" class="screen scanlines">
+  <div class="crt-flicker" style="position:fixed;inset:0;pointer-events:none;background:transparent;"></div>
+  <header class="binder-header">
+    <button class="retro back-btn" onclick="showLanding()">&#9664; BACK</button>
+    <h1 class="retro binder-title">SELECT YOUR MIXTAPE</h1>
+  </header>
+  <div class="binder-main">
+    <div class="binder-wrap">
+      <div class="binder-spine"></div>
+      <div class="disc-grid" id="disc-grid"></div>
+    </div>
+  </div>
+  <footer class="binder-footer">
+    <button class="retro page-btn" id="prev-btn" onclick="prevPage()" disabled>&#9664; PREV</button>
+    <span class="retro page-label" id="page-label">DISC 1 OF 2</span>
+    <button class="retro page-btn" id="next-btn" onclick="nextPage()">NEXT &#9654;</button>
+  </footer>
+</div>
+
+<!-- AUTO GENERATE -->
+<div id="screen-autogen" class="screen scanlines">
+  <div class="crt-flicker" style="position:fixed;inset:0;pointer-events:none;background:transparent;"></div>
+  <div class="autogen-content">
+    <h1 class="retro autogen-title">AI GENERATION</h1>
+    <p class="retro autogen-sub">-- INITIALIZING... --</p>
+    <p class="retro autogen-soon">COMING SOON</p>
+  </div>
+  <button class="retro autogen-back" onclick="showLanding()">&#9664; BACK TO MENU</button>
+</div>
+
+<!-- CREATE NEW (stub) -->
+<div id="screen-create" class="screen scanlines" style="align-items:center;justify-content:center;background:#0a0a0a;">
+  <div class="crt-flicker" style="position:fixed;inset:0;pointer-events:none;background:transparent;"></div>
+  <div style="text-align:center;position:relative;z-index:10;padding:2rem;">
+    <h1 class="retro" style="font-size:clamp(2rem,7vw,3.5rem);letter-spacing:0.2em;color:#d4d4d8;">CREATE NEW</h1>
+    <p class="retro" style="font-size:1.2rem;letter-spacing:0.2em;color:#52525b;margin-top:0.75rem;">[ EXISTING APP - UNCHANGED ]</p>
+    <p style="margin-top:1rem;font-size:0.8rem;color:#3f3f46;letter-spacing:0.1em;font-family:'Space Mono',monospace;">Routes to the project creation and clip editor UI.</p>
+  </div>
+  <button class="retro autogen-back" onclick="showLanding()">&#9664; BACK TO MENU</button>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" class="loading-overlay" style="display:none;">
+  <div class="loading-disc" id="loading-disc">
+    <div class="loading-disc-hole"></div>
+  </div>
+  <p class="retro loading-text">LOADING DISC...</p>
+</div>
+
+<script>
+  const CD_GRADIENT = [
+    'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.05) 28%, transparent 48%)',
+    'radial-gradient(circle at 50% 50%, rgba(210,210,225,0.5) 0%, rgba(170,170,190,0.15) 45%, transparent 68%)',
+    'conic-gradient(from 200deg, #adadb8, #cfc060, #e085b0, #85a8e0, #85e0b8, #b885e0, #e09085, #adadb8, #cfc060, #adadb8)'
+  ].join(', ');
+
+  const PROJECTS = [
+    { id: 1, name: "Friday Night Bangers", clip_count: 52 },
+    { id: 2, name: "90s Throwback", clip_count: 60 },
+    { id: 3, name: "Summer Vibes 2024", clip_count: 38 },
+    { id: 4, name: "Rave Cave Mix", clip_count: 60 },
+    { id: 5, name: "Indie Anthems", clip_count: 21 },
+    { id: 6, name: "Hip Hop Hour", clip_count: 45 },
+    { id: 7, name: "Pop Punk Party", clip_count: 12 },
+  ];
+
+  const ITEMS_PER_PAGE = 4;
+  let currentPage = 0;
+  const totalPages = Math.ceil(PROJECTS.length / ITEMS_PER_PAGE);
+
+  function splitName(name) {
+    if (name.length <= 9) return [name, null];
+    const mid = name.lastIndexOf(' ', 9);
+    if (mid <= 0) return [name.slice(0, 8) + '...', null];
+    return [name.slice(0, mid), name.slice(mid + 1)];
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+  function showLanding()  { showScreen('screen-landing'); }
+  function showBinder()   { renderBinder(); showScreen('screen-binder'); }
+  function showAutoGen()  { showScreen('screen-autogen'); }
+  function showCreate()   { showScreen('screen-create'); }
+
+  function renderBinder() {
+    const grid = document.getElementById('disc-grid');
+    const items = PROJECTS.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE);
+    grid.innerHTML = '';
+
+    items.forEach(project => {
+      const [line1, line2] = splitName(project.name);
+
+      const btn = document.createElement('button');
+      btn.className = 'disc-slot';
+      btn.onclick = () => handleDiscClick(project.id, btn);
+
+      const sleeve = document.createElement('div');
+      sleeve.className = 'cd-sleeve';
+      sleeve.style.width = '100%';
+
+      const disc = document.createElement('div');
+      disc.className = 'cd-disc';
+      disc.style.background = CD_GRADIENT;
+      disc.style.boxShadow = '0 2px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)';
+
+      // Top outer-ring text
+      const textTop = document.createElement('div');
+      textTop.className = 'cd-text-top';
+      const span1 = document.createElement('span');
+      span1.className = 'cd-sharpie-top';
+      span1.textContent = line1;
+      textTop.appendChild(span1);
+      disc.appendChild(textTop);
+
+      // Hub ring (visual only)
+      const hubRing = document.createElement('div');
+      hubRing.className = 'cd-hub-ring';
+      disc.appendChild(hubRing);
+
+      // Spindle hole
+      const hole = document.createElement('div');
+      hole.className = 'cd-hole';
+      disc.appendChild(hole);
+
+      // Bottom outer-ring text (overflow)
+      if (line2) {
+        const textBottom = document.createElement('div');
+        textBottom.className = 'cd-text-bottom';
+        const span2 = document.createElement('span');
+        span2.className = 'cd-sharpie-bottom';
+        span2.textContent = line2;
+        textBottom.appendChild(span2);
+        disc.appendChild(textBottom);
+      }
+
+      sleeve.appendChild(disc);
+      btn.appendChild(sleeve);
+
+      const clips = document.createElement('p');
+      clips.className = 'disc-clips';
+      clips.textContent = project.clip_count + ' CLIPS';
+      btn.appendChild(clips);
+
+      grid.appendChild(btn);
+    });
+
+    // Empty slots
+    for (let i = items.length; i < ITEMS_PER_PAGE; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'cd-sleeve';
+      empty.style.opacity = '0';
+      grid.appendChild(empty);
+    }
+
+    document.getElementById('page-label').textContent = 'DISC ' + (currentPage + 1) + ' OF ' + totalPages;
+    document.getElementById('prev-btn').disabled = currentPage === 0;
+    document.getElementById('next-btn').disabled = currentPage >= totalPages - 1;
+  }
+
+  function prevPage() { if (currentPage > 0) { currentPage--; renderBinder(); } }
+  function nextPage() { if (currentPage < totalPages - 1) { currentPage++; renderBinder(); } }
+
+  function handleDiscClick(id, btn) {
+    document.querySelectorAll('.disc-slot').forEach(s => { if (s !== btn) s.classList.add('dimmed'); });
+    btn.classList.add('animating');
+
+    const overlay = document.getElementById('loading-overlay');
+    const disc = document.getElementById('loading-disc');
+    disc.style.background = CD_GRADIENT;
+    overlay.style.display = 'flex';
+
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      showProjectStub(id);
+    }, 1200);
+  }
+
+  function showProjectStub(id) {
+    const project = PROJECTS.find(p => p.id === id);
+    let stub = document.getElementById('screen-project-stub');
+    if (!stub) {
+      stub = document.createElement('div');
+      stub.id = 'screen-project-stub';
+      stub.className = 'screen scanlines';
+      stub.style.cssText = 'align-items:center;justify-content:center;background:#0a0a0a;';
+      stub.innerHTML = '<div class="crt-flicker" style="position:fixed;inset:0;pointer-events:none;background:transparent;"></div>'
+        + '<div style="text-align:center;position:relative;z-index:10;padding:2rem;">'
+        + '<p class="retro" style="font-size:1rem;letter-spacing:0.25em;color:#52525b;margin-bottom:0.5rem;">NOW PLAYING</p>'
+        + '<h1 class="retro" id="stub-name" style="font-size:clamp(1.8rem,6vw,3rem);letter-spacing:0.15em;color:#f4f4f5;"></h1>'
+        + '<p class="retro" id="stub-clips" style="font-size:1.2rem;letter-spacing:0.2em;color:#52525b;margin-top:0.5rem;"></p>'
+        + '<p style="margin-top:1.5rem;font-size:0.75rem;color:#3f3f46;letter-spacing:0.1em;font-family:Space Mono,monospace;">In the real app this opens the full project editor.</p>'
+        + '</div>'
+        + '<button class="retro autogen-back" onclick="backToBinder()" style="bottom:2.5rem;">&#9664; BACK TO BINDER</button>';
+      document.body.appendChild(stub);
+    }
+    document.getElementById('stub-name').textContent = project.name.toUpperCase();
+    document.getElementById('stub-clips').textContent = project.clip_count + ' CLIPS';
+    showScreen('screen-project-stub');
+  }
+
+  function backToBinder() {
+    document.querySelectorAll('.disc-slot').forEach(s => s.classList.remove('dimmed', 'animating'));
+    showScreen('screen-binder');
+  }
+
+  document.querySelectorAll('.menu-item').forEach((item, i) => {
+    item.addEventListener('touchstart', () => {
+      document.querySelectorAll('.menu-item').forEach((mi, j) => {
+        mi.querySelector('.menu-arrow, .menu-arrow-hidden').className = i === j ? 'menu-arrow' : 'menu-arrow-hidden';
+      });
+    }, { passive: true });
+  });
+</script>
+</body>
+</html>

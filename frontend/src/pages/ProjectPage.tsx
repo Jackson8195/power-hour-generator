@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   Search,
@@ -11,6 +11,7 @@ import {
   GripVertical,
   ChevronDown,
   Scissors,
+  CheckCircle2,
 } from "lucide-react";
 import type {
   Clip,
@@ -34,6 +35,7 @@ import {
   useSuggestedSegment,
 } from "../utils/api";
 import clsx from "clsx";
+import CrtStaticText from "../components/CrtStaticText";
 
 type DraftRange = { start: number; end: number };
 
@@ -259,140 +261,194 @@ export default function ProjectPage() {
   }
 
   if (!project) {
-    return <div className="py-20 text-center text-zinc-500">Loading project...</div>;
+    return (
+      <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
+        <CrtStaticText
+          as="p"
+          text="LOADING PROJECT..."
+          textClassName="animate-pulse font-retro text-2xl tracking-[0.22em] text-[#91fff2]/70"
+        />
+      </div>
+    );
   }
 
   const reviewedClips = project.clips.filter((c) => c.has_selection);
 
   return (
-    <div>
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-100">{project.name}</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {reviewedClips.length} / {project.clips.length} clips have a selected range
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleStartRender}
-            disabled={reviewedClips.length === 0 || renderProgress?.status === "rendering"}
-            className="btn-primary"
-          >
-            {renderProgress?.status === "rendering" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            Render Video
-          </button>
-        </div>
-      </div>
+    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden rounded-[28px] bg-[#070b10] px-4 py-6 scanlines sm:px-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,43,157,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_26%)]" />
 
-      {renderProgress && (
-        <div className="card mb-6">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-zinc-400">
-              {renderProgress.status === "rendering"
-                ? "Rendering..."
-                : renderProgress.status === "complete"
-                  ? "Render complete!"
-                  : `Status: ${renderProgress.status}`}
-            </span>
-            <span className="font-mono text-zinc-500">
-              {Math.round(renderProgress.progress)}%
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className={clsx(
-                "h-full rounded-full transition-all",
-                renderProgress.status === "complete"
-                  ? "bg-green-500"
-                  : renderProgress.status === "error"
-                    ? "bg-red-500"
-                    : "bg-brand-500"
+      <section className="retro-shell relative mx-auto max-w-7xl rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
+        <div className="relative z-10">
+          <div className="mb-6 flex flex-col gap-5 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="font-retro text-xs tracking-[0.45em] text-[#1affe4]/60">
+                EDIT MIXTAPE
+              </p>
+              <CrtStaticText
+                as="h1"
+                text={project.name.toUpperCase()}
+                className="mt-2"
+                textClassName="font-retro text-3xl tracking-[0.22em] text-[#ff77c2] glow-text sm:text-5xl"
+              />
+              <p className="mt-3 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
+                {reviewedClips.length} of {project.clips.length} clips have a locked-in range.
+              </p>
+            </div>
+            <button
+              onClick={handleStartRender}
+              disabled={reviewedClips.length === 0 || renderProgress?.status === "rendering"}
+              className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 rounded-xl px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {renderProgress?.status === "rendering" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
               )}
-              style={{ width: `${renderProgress.progress}%` }}
-            />
+              <span className="crt-action__label" data-text="RENDER VIDEO">
+                RENDER VIDEO
+              </span>
+            </button>
           </div>
-          {renderProgress.status === "complete" && renderProgress.output_path && (
-            <div className="mt-3 flex gap-2">
-              <a
-                href={`/static/renders/${renderProgress.output_path.split("/").pop()}`}
-                target="_blank"
-                className="btn-secondary text-xs"
-                rel="noreferrer"
-              >
-                <Play className="h-3.5 w-3.5" />
-                Watch
-              </a>
-              <button className="btn-secondary text-xs">
-                <Tv className="h-3.5 w-3.5" />
-                Cast to TV
-              </button>
+
+          {renderProgress && (
+            <div className="retro-panel mb-6 rounded-[22px] p-5">
+              <div className="relative z-10">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-retro text-sm tracking-[0.18em] text-[#91fff2]">
+                    {renderProgress.status === "rendering"
+                      ? "RENDERING..."
+                      : renderProgress.status === "complete"
+                        ? "RENDER COMPLETE"
+                        : `STATUS: ${renderProgress.status.toUpperCase()}`}
+                  </p>
+                  <span className="font-mono text-sm text-[#ffb6dd]/75">
+                    {Math.round(renderProgress.progress)}%
+                  </span>
+                </div>
+                <div className="retro-progress h-2 overflow-hidden rounded-full">
+                  <div
+                    className={clsx(
+                      "h-full rounded-full transition-all",
+                      renderProgress.status === "complete"
+                        ? "bg-green-500"
+                        : renderProgress.status === "error"
+                          ? "bg-red-500"
+                          : "retro-progress__bar"
+                    )}
+                    style={{ width: `${renderProgress.progress}%` }}
+                  />
+                </div>
+                {renderProgress.status === "complete" && renderProgress.output_path && (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <a
+                      href={`/static/renders/${renderProgress.output_path.split("/").pop()}`}
+                      target="_blank"
+                      className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-sm tracking-[0.16em]"
+                      rel="noreferrer"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      <span className="crt-action__label" data-text="WATCH">
+                        WATCH
+                      </span>
+                    </a>
+                    <button className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-sm tracking-[0.16em]">
+                      <Tv className="h-3.5 w-3.5" />
+                      <span className="crt-action__label" data-text="CAST TO TV">
+                        CAST TO TV
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      <div className="mb-4 flex gap-1 border-b border-zinc-800">
-        <button
-          onClick={() => setActiveTab("search")}
-          className={clsx(
-            "px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "search"
-              ? "border-b-2 border-brand-500 text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <Search className="mr-1.5 inline h-4 w-4" />
-          Search & Add
-        </button>
-        <button
-          onClick={() => setActiveTab("timeline")}
-          className={clsx(
-            "px-4 py-2 text-sm font-medium transition-colors",
-            activeTab === "timeline"
-              ? "border-b-2 border-brand-500 text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-300"
-          )}
-        >
-          <GripVertical className="mr-1.5 inline h-4 w-4" />
-          Review Clips ({project.clips.length})
-        </button>
-      </div>
+          <div className="mb-5 flex flex-wrap gap-3">
+            <button
+              onClick={() => setActiveTab("search")}
+              className={clsx(
+                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
+                activeTab === "search"
+                  ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
+                  : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
+              )}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                <span className="crt-action__label" data-text="SEARCH & ADD">
+                  SEARCH & ADD
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("timeline")}
+              className={clsx(
+                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
+                activeTab === "timeline"
+                  ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
+                  : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
+              )}
+            >
+              <span className="inline-flex items-center gap-2">
+                <GripVertical className="h-4 w-4" />
+                <span className="crt-action__label" data-text={`REVIEW CLIPS (${project.clips.length})`}>
+                  REVIEW CLIPS ({project.clips.length})
+                </span>
+              </span>
+            </button>
+          </div>
 
-      {activeTab === "search" && (
-        <div>
+          {activeTab === "search" && (
+            <div>
           <form onSubmit={handleSearch} className="mb-4 flex gap-2">
             <input
               type="text"
-              className="input-field"
+              className="retro-input w-full rounded-xl px-4 py-3 font-mono text-sm tracking-[0.12em]"
               placeholder="Search for music videos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button type="submit" disabled={searching} className="btn-primary shrink-0">
+            <button
+              type="submit"
+              disabled={searching}
+              className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+            >
               {searching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Search className="h-4 w-4" />
               )}
-              Search
+              <span className="crt-action__label" data-text="SEARCH">
+                SEARCH
+              </span>
             </button>
           </form>
+
+          {searchResults.length > 0 && (
+            <div className="mb-6 space-y-2">
+              {searchResults.map((result) => (
+                <SearchResultCard
+                  key={result.youtube_id}
+                  result={result}
+                  alreadyAdded={project.clips.some((clip) => clip.youtube_id === result.youtube_id)}
+                  onAdd={() => handleAddClip(result)}
+                  badgeLabel={result.match_score > 0 ? `Score ${result.match_score.toFixed(1)}` : ""}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-zinc-200">Recommended next picks</p>
-                <p className="text-xs text-zinc-500">
+                <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">RECOMMENDED NEXT PICKS</p>
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
                   Suggestions update from the artists already showing up in this project.
                 </p>
               </div>
               {loadingRecommendations && (
-                <div className="text-xs text-zinc-500">
+                <div className="font-retro text-xs tracking-[0.16em] text-[#91fff2]/60">
                   <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> Refreshing
                 </div>
               )}
@@ -412,31 +468,26 @@ export default function ProjectPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 px-4 py-3 text-sm text-zinc-500">
+              <div className="retro-panel rounded-[18px] px-4 py-4 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/45">
                 Add a few songs and this section will start surfacing more picks from the same artists.
               </div>
             )}
           </div>
+            </div>
+          )}
 
-          <div className="space-y-2">
-            {searchResults.map((result) => (
-              <SearchResultCard
-                key={result.youtube_id}
-                result={result}
-                alreadyAdded={project.clips.some((clip) => clip.youtube_id === result.youtube_id)}
-                onAdd={() => handleAddClip(result)}
-                badgeLabel={result.match_score > 0 ? `Score ${result.match_score.toFixed(1)}` : ""}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === "timeline" && (
-        <div className="space-y-3">
+          {activeTab === "timeline" && (
+            <div className="space-y-3">
           {project.clips.length === 0 ? (
-            <div className="py-16 text-center text-zinc-500">
-              No clips yet. Search and add songs to get started!
+            <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
+              <CrtStaticText
+                as="p"
+                text="NO CLIPS YET"
+                textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
+              />
+              <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
+                Search and add songs to begin the review flow.
+              </p>
             </div>
           ) : (
             project.clips.map((clip, index) => (
@@ -461,8 +512,10 @@ export default function ProjectPage() {
               />
             ))
           )}
+            </div>
+          )}
         </div>
-      )}
+      </section>
     </div>
   );
 }
@@ -481,34 +534,36 @@ function SearchResultCard({
   subcopy?: string;
 }) {
   return (
-    <div className="card flex items-center gap-4">
+    <div className="retro-project-card flex items-center gap-4 rounded-[20px] p-4">
       <img
         src={result.thumbnail}
         alt={result.title}
-        className="h-16 w-28 shrink-0 rounded object-cover"
+        className="h-16 w-28 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-zinc-100">{result.title}</p>
+          <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
           {badgeLabel ? (
-            <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
+            <span className="rounded-full border border-[#1affe4]/14 bg-[#08141b] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#91fff2]/70">
               {badgeLabel}
             </span>
           ) : null}
         </div>
-        <p className="text-xs text-zinc-500">
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/55">
           {result.artist}
           {result.duration && ` · ${result.duration}`}
         </p>
-        {subcopy ? <p className="mt-1 text-xs text-zinc-600">{subcopy}</p> : null}
+        {subcopy ? <p className="mt-1 font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/35">{subcopy}</p> : null}
       </div>
       <button
         onClick={onAdd}
         disabled={alreadyAdded}
-        className="btn-primary shrink-0 text-xs"
+        className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Download className="h-3.5 w-3.5" />
-        {alreadyAdded ? "Added" : "Add"}
+        <span className="crt-action__label" data-text={alreadyAdded ? "ADDED" : "ADD"}>
+          {alreadyAdded ? "ADDED" : "ADD"}
+        </span>
       </button>
     </div>
   );
@@ -545,10 +600,18 @@ function ClipReviewCard({
   onCommit: () => void;
   onDraftChange: (range: DraftRange) => void;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const selection = draft ?? { start: clip.start_time, end: clip.end_time };
   const maxDuration = analysis?.duration || clip.duration || 0;
   const hasValidSelection = selection.end > selection.start;
   const committedClip = clip.preview_url.includes("/media/clips/");
+
+  function seekVideo(time: number) {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      videoRef.current.play();
+    }
+  }
 
   const statusCopy = {
     pending: "Waiting to download",
@@ -559,27 +622,40 @@ function ClipReviewCard({
   }[clip.status];
 
   return (
-    <div className="card overflow-hidden">
+    <div
+      className={clsx(
+        "retro-project-card overflow-hidden rounded-[22px] p-4",
+        committedClip && "border-l-2 border-l-green-500"
+      )}
+    >
       <div className="flex items-center gap-3">
         <div className="flex w-8 shrink-0 items-center justify-center">
-          <span className="font-mono text-xs text-zinc-600">{index + 1}</span>
+          <span className="font-retro text-xs tracking-[0.2em] text-[#91fff2]/45">{index + 1}</span>
         </div>
 
         {clip.source_thumbnail ? (
           <img
             src={clip.source_thumbnail}
             alt={clip.source_title}
-            className="h-14 w-24 shrink-0 rounded object-cover"
+            className="h-14 w-24 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
           />
         ) : (
-          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded bg-zinc-800">
+          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-[#08131a]">
             <Play className="h-4 w-4 text-zinc-600" />
           </div>
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-zinc-100">{clip.source_title}</p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2">
+            <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{clip.source_title}</p>
+            {committedClip && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-green-400">
+                <CheckCircle2 className="h-3 w-3" />
+                Clipped
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
             <span>{clip.source_artist}</span>
             {clip.bpm && <span>· {Math.round(clip.bpm)} BPM</span>}
             <span>· {statusCopy}</span>
@@ -588,33 +664,40 @@ function ClipReviewCard({
                 · {formatTime(clip.start_time)} to {formatTime(clip.end_time)}
               </span>
             )}
-            {committedClip && <span>· trimmed clip saved</span>}
           </div>
         </div>
 
         {clip.status === "ready" && (
-          <button onClick={onExpand} className="btn-secondary px-3 py-2 text-xs">
+          <button
+            onClick={onExpand}
+            className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+          >
             <ChevronDown className={clsx("h-4 w-4 transition-transform", expanded && "rotate-180")} />
-            {clip.has_selection ? "Edit Review" : "Open Review"}
+            <span
+              className="crt-action__label"
+              data-text={clip.has_selection ? "EDIT REVIEW" : "OPEN REVIEW"}
+            >
+              {clip.has_selection ? "EDIT REVIEW" : "OPEN REVIEW"}
+            </span>
           </button>
         )}
 
         <button
           onClick={onDelete}
-          className="rounded p-1.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400"
+          className="rounded-lg p-1.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-300"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
 
       {clip.status !== "ready" && (
-        <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-xs text-zinc-500">
+        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
           {clip.status === "error" ? clip.source_title + " failed to process." : statusCopy}
         </div>
       )}
 
       {clip.status === "ready" && !expanded && !clip.has_selection && (
-        <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-xs text-zinc-500">
+        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
           Analysis is ready. Click Open Review to see the waveform and choose a range.
         </div>
       )}
@@ -623,7 +706,7 @@ function ClipReviewCard({
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">
             {loadingAnalysis ? (
-              <div className="flex h-56 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950/40 text-zinc-500">
+              <div className="retro-panel flex h-56 items-center justify-center rounded-[22px] text-[#91fff2]/55">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading analysis...
               </div>
@@ -631,18 +714,19 @@ function ClipReviewCard({
               <>
                 {clip.preview_url && (
                   <video
+                    ref={videoRef}
                     src={clip.preview_url}
                     controls
                     preload="metadata"
-                    className="w-full rounded-xl border border-zinc-800 bg-black"
+                    className="w-full rounded-[22px] border border-[#1affe4]/12 bg-black"
                   />
                 )}
 
-                <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+                <div className="retro-panel rounded-[22px] p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">Suggested energy map</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">SUGGESTED ENERGY MAP</p>
+                      <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
                         Bright blocks point to likely chorus or high-energy sections.
                       </p>
                     </div>
@@ -650,14 +734,16 @@ function ClipReviewCard({
                       <button
                         onClick={onUseSuggestion}
                         disabled={saving}
-                        className="btn-secondary px-3 py-2 text-xs"
+                        className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
                       >
                         {saving ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Sparkles className="h-3.5 w-3.5" />
                         )}
-                        Use recommendation
+                        <span className="crt-action__label" data-text="USE RECOMMENDATION">
+                          USE RECOMMENDATION
+                        </span>
                       </button>
                     )}
                   </div>
@@ -667,6 +753,7 @@ function ClipReviewCard({
                     highlights={analysis?.highlights ?? []}
                     duration={maxDuration}
                     selection={selection}
+                    onSeek={seekVideo}
                   />
 
                   {analysis?.highlights?.length ? (
@@ -674,8 +761,11 @@ function ClipReviewCard({
                       {analysis.highlights.map((highlight) => (
                         <button
                           key={`${highlight.start}-${highlight.end}`}
-                          onClick={() => onDraftChange({ start: highlight.start, end: highlight.end })}
-                          className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 transition-colors hover:border-brand-500 hover:text-white"
+                          onClick={() => {
+                            onDraftChange({ start: highlight.start, end: highlight.end });
+                            seekVideo(highlight.start);
+                          }}
+                          className="rounded-full border border-[#1affe4]/14 bg-[#08131a] px-3 py-1 font-retro text-xs tracking-[0.14em] text-[#91fff2]/70 transition-colors hover:border-[#ff2b9d]/30 hover:text-[#ffd7eb]"
                         >
                           {highlight.label}: {formatTime(highlight.start)} to {formatTime(highlight.end)}
                         </button>
@@ -687,9 +777,9 @@ function ClipReviewCard({
             )}
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-            <p className="text-sm font-medium text-zinc-200">Pick the exact range</p>
-            <p className="mt-1 text-xs text-zinc-500">
+          <div className="retro-panel rounded-[22px] p-4">
+            <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">PICK THE EXACT RANGE</p>
+            <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
               Choose any start and end time. It does not need to be exactly 60 seconds.
             </p>
 
@@ -718,7 +808,7 @@ function ClipReviewCard({
               />
             </div>
 
-            <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-xs text-zinc-400">
+            <div className="mt-4 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 p-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
               <div className="flex items-center justify-between">
                 <span>Chosen range</span>
                 <span className="font-mono text-zinc-200">
@@ -737,26 +827,30 @@ function ClipReviewCard({
               <button
                 onClick={onSaveDraft}
                 disabled={!hasValidSelection || saving}
-                className="btn-secondary px-3 py-2 text-xs"
+                className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                Save range
+                <span className="crt-action__label" data-text="SAVE RANGE">
+                  SAVE RANGE
+                </span>
               </button>
               <button
                 onClick={onCommit}
                 disabled={!hasValidSelection || committing}
-                className="btn-primary px-3 py-2 text-xs"
+                className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {committing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Scissors className="h-3.5 w-3.5" />
                 )}
-                Trim and discard full video
+                <span className="crt-action__label" data-text="TRIM AND DISCARD FULL VIDEO">
+                  TRIM AND DISCARD FULL VIDEO
+                </span>
               </button>
             </div>
 
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/40">
               Saving keeps your chosen timestamps. Trimming creates the final clip file and frees the original download.
             </p>
           </div>
@@ -771,28 +865,35 @@ function WaveformPreview({
   highlights,
   duration,
   selection,
+  onSeek,
 }: {
   waveform: number[];
   highlights: ClipAnalysis["highlights"];
   duration: number;
   selection: DraftRange;
+  onSeek?: (time: number) => void;
 }) {
+  function handleWaveformClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!duration || !onSeek) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    onSeek(Math.max(0, Math.min(ratio * duration, duration)));
+  }
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-950 to-zinc-900 px-2 py-5">
+    <div
+      className={clsx(
+        "relative overflow-hidden rounded-[20px] border border-[#1affe4]/12 bg-gradient-to-b from-[#08131b] to-[#050c12] px-2 py-5",
+        onSeek && "cursor-pointer"
+      )}
+      onClick={handleWaveformClick}
+      title={onSeek ? "Click to seek video" : undefined}
+    >
+      {/* selection overlay — non-interactive */}
       <div className="pointer-events-none absolute inset-0">
-        {highlights.map((highlight) => (
-          <div
-            key={`${highlight.start}-${highlight.end}`}
-            className="absolute inset-y-0 rounded-lg bg-brand-500/12"
-            style={{
-              left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
-              width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
-            }}
-          />
-        ))}
         {selection.end > selection.start && (
           <div
-            className="absolute inset-y-0 rounded-lg border border-emerald-400/70 bg-emerald-400/12"
+            className="absolute inset-y-0 rounded-lg border border-[#ff77c2]/75 bg-[#ff2b9d]/12"
             style={{
               left: `${duration ? (selection.start / duration) * 100 : 0}%`,
               width: `${duration ? ((selection.end - selection.start) / duration) * 100 : 0}%`,
@@ -800,11 +901,32 @@ function WaveformPreview({
           />
         )}
       </div>
-      <div className="relative flex h-28 items-end gap-[2px]">
+
+      {/* clickable highlight regions */}
+      <div className="absolute inset-0">
+        {highlights.map((highlight) => (
+          <div
+            key={`${highlight.start}-${highlight.end}`}
+            className="absolute inset-y-0 rounded-lg bg-[#1affe4]/10 transition-colors hover:bg-[#1affe4]/20"
+            style={{
+              left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
+              width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
+            }}
+            title={`${highlight.label} — click to play from ${formatTime(highlight.start)}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSeek?.(highlight.start);
+            }}
+          />
+        ))}
+      </div>
+
+      {/* waveform bars */}
+      <div className="pointer-events-none relative flex h-28 items-end gap-[2px]">
         {(waveform.length ? waveform : new Array(80).fill(0.15)).map((bar, index) => (
           <div
             key={`${index}-${bar}`}
-            className="flex-1 rounded-full bg-zinc-600/90"
+            className="flex-1 rounded-full bg-[#91fff2]/75"
             style={{ height: `${Math.max(bar * 100, 8)}%` }}
           />
         ))}
@@ -826,8 +948,8 @@ function RangeControl({
 }) {
   return (
     <label className="block">
-      <div className="mb-1 flex items-center justify-between text-xs text-zinc-400">
-        <span>{label}</span>
+      <div className="mb-1 flex items-center justify-between font-retro text-xs tracking-[0.16em] text-[#91fff2]/65">
+        <span>{label.toUpperCase()}</span>
         <span className="font-mono text-zinc-200">{formatTime(value)}</span>
       </div>
       <input
@@ -837,7 +959,7 @@ function RangeControl({
         step={0.5}
         value={Math.min(value, Math.max(max, 1))}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-brand-500"
+        className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[#08131a] accent-[#ff2b9d]"
       />
     </label>
   );

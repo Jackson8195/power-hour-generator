@@ -120,6 +120,30 @@ UX expectations:
 - Saving a range should feel non-destructive
 - Trimming should be the explicit destructive/storage-saving action
 
+## Styling Guidance
+
+Visual direction:
+- Lean into a CRT/VHS-inspired interface rather than a generic dark dashboard
+- Prefer neon-accented typography, phosphor-like glow, subtle bloom, and layered overlays
+- Motion should feel analog and imperfect: flicker, scan passes, glow pulses, and small instability are good when used intentionally
+
+Landing page guidance:
+- The main title should feel alive with restrained CRT behavior, not constant chaos
+- Static titles should use the ambient/randomized CRT treatment:
+  - low-level text flicker
+  - occasional scan-line sweep across the title
+  - slight channel separation or ghosting only in short bursts
+- Interactive text controls should use triggered CRT feedback on hover/focus:
+  - a brief flicker first
+  - then a scan-line pass
+- Keep menu interactions crisp and readable even when the title is animated
+
+Implementation notes:
+- Prefer shared CSS classes in [`frontend/src/styles/globals.css`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/frontend/src/styles/globals.css) for reusable retro effects
+- Use React state/effects only when timing needs to feel irregular or event-driven
+- Preserve readability first: effects should decorate text, not obscure it
+- If adding motion, consider reducing intensity on dense workflow screens compared with the landing screen
+
 ## Verification
 
 Preferred lightweight verification:
