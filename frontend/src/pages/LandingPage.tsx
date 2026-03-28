@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import clsx from "clsx";
 
 const MENU_ITEMS = [
   { label: "INSERT MIXTAPE", to: "/mixtapes" },
@@ -13,54 +12,77 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0a0a] scanlines">
-      {/* CRT flicker overlay — own layer so children aren't repainted */}
+      {/* CRT flicker overlay */}
       <div className="pointer-events-none fixed inset-0 animate-crt-flicker bg-transparent" />
 
-      <main className="flex min-h-screen flex-col items-center justify-center gap-16 px-6">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-12 px-6">
         {/* Title block */}
         <div className="text-center">
-          <h1 className="font-retro text-6xl tracking-widest text-white sm:text-7xl lg:text-8xl">
+          <h1
+            className="font-retro tracking-widest glow-text text-6xl sm:text-7xl lg:text-8xl"
+            style={{ color: "#ff2b9d" }}
+          >
             POWER HOUR STUDIO
           </h1>
-          <p className="mt-3 font-retro text-lg tracking-widest text-zinc-500 sm:text-xl">
-            60 TRACKS &nbsp;·&nbsp; 60 MINUTES &nbsp;·&nbsp; 1 LEGENDARY NIGHT
-          </p>
         </div>
 
-        {/* DVD-menu navigation */}
-        <nav className="flex flex-col items-start gap-2">
+        {/* DVD-menu navigation panel */}
+        <nav
+          className="w-full"
+          style={{
+            maxWidth: "360px",
+            border: "1px solid rgba(26, 255, 228, 0.15)",
+            background: "rgba(0, 20, 20, 0.6)",
+          }}
+        >
           {MENU_ITEMS.map((item, i) => (
-            <Link
+            <div
               key={item.to}
-              to={item.to}
+              className="group relative cursor-pointer"
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
-              onFocus={() => setHoveredIndex(i)}
-              onBlur={() => setHoveredIndex(null)}
-              className={clsx(
-                "flex items-center gap-3 font-retro text-3xl tracking-widest transition-all duration-150 sm:text-4xl",
-                hoveredIndex === i
-                  ? "text-brand-400 glow-text"
-                  : "text-zinc-400 hover:text-brand-400"
-              )}
             >
-              {/* Fixed-width arrow column — reserves space to prevent layout shift */}
-              <span className="inline-block w-7 text-right">
-                {hoveredIndex === i ? (
-                  <span className="inline-block animate-menu-slide">▶</span>
-                ) : (
-                  <span className="opacity-0">▶</span>
-                )}
-              </span>
-              {item.label}
-            </Link>
+              {/* Highlight bar */}
+              <div
+                className="absolute inset-0 transition-opacity duration-100"
+                style={{
+                  opacity: hoveredIndex === i ? 1 : 0,
+                  background: "rgba(255, 43, 157, 0.15)",
+                  borderLeft: "3px solid #ff2b9d",
+                }}
+              />
+              <Link
+                to={item.to}
+                onFocus={() => setHoveredIndex(i)}
+                onBlur={() => setHoveredIndex(null)}
+                className="relative flex items-center gap-4 px-5 py-2.5 font-retro text-xl tracking-wider transition-colors duration-100"
+                style={{
+                  color: hoveredIndex === i ? "#ff2b9d" : "#1affe4",
+                  textShadow:
+                    hoveredIndex === i
+                      ? "0 0 8px #ff2b9d, 0 0 20px #ff2b9d88"
+                      : "none",
+                }}
+              >
+                <span
+                  className="w-4 text-right"
+                  style={{ opacity: hoveredIndex === i ? 1 : 0 }}
+                >
+                  ▶
+                </span>
+                {item.label}
+              </Link>
+            </div>
           ))}
         </nav>
       </main>
 
       <footer className="absolute bottom-0 w-full pb-6 text-center">
-        <span className="font-retro text-xs tracking-widest text-zinc-700">
-          © POWER HOUR STUDIOS &nbsp;·&nbsp; EST. 2024
+        <span
+          className="font-retro text-xs tracking-widest"
+          style={{ color: "#0d4040" }}
+        >
+          &#169; POWER HOUR STUDIOS &nbsp;&#183;&nbsp; EST. 2024
         </span>
       </footer>
     </div>

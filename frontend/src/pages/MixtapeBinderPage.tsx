@@ -13,9 +13,9 @@ const CD_GRADIENT = [
 ].join(", ");
 
 function splitName(name: string): [string, string | null] {
-  if (name.length <= 13) return [name, null];
-  const mid = name.lastIndexOf(" ", 13);
-  if (mid <= 0) return [name.slice(0, 12) + "…", null];
+  if (name.length <= 9) return [name, null];
+  const mid = name.lastIndexOf(" ", 9);
+  if (mid <= 0) return [name.slice(0, 8) + "…", null];
   return [name.slice(0, mid), name.slice(mid + 1)];
 }
 
@@ -231,7 +231,30 @@ function DiscSlot({
             boxShadow: "0 2px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.15)",
           }}
         >
-          {/* Hub ring — darker circle behind the label area */}
+          {/* Top outer-ring text */}
+          <div
+            style={{
+              position: "absolute",
+              top: "7%",
+              left: "12%",
+              right: "12%",
+              textAlign: "center",
+            }}
+          >
+            <span
+              className="font-marker text-[#111]"
+              style={{
+                fontSize: "clamp(0.42rem, 2vw, 0.65rem)",
+                transform: "rotate(-3deg)",
+                display: "block",
+                lineHeight: 1.1,
+              }}
+            >
+              {line1}
+            </span>
+          </div>
+
+          {/* Hub ring — visual only */}
           <div
             style={{
               position: "absolute",
@@ -241,51 +264,6 @@ function DiscSlot({
               border: "1px solid rgba(255,255,255,0.1)",
             }}
           />
-
-          {/* Sharpie text area */}
-          <div
-            style={{
-              position: "absolute",
-              inset: "28%",
-              borderRadius: "50%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "6%",
-            }}
-          >
-            <span
-              className="font-marker leading-tight text-[#111]"
-              style={{
-                fontSize: "clamp(0.45rem, 2.2vw, 0.72rem)",
-                transform: "rotate(-4deg)",
-                display: "block",
-                textAlign: "center",
-                maxWidth: "100%",
-                wordBreak: "break-word",
-                lineHeight: 1.2,
-              }}
-            >
-              {line1}
-            </span>
-            {line2 && (
-              <span
-                className="font-marker leading-tight text-[#111]"
-                style={{
-                  fontSize: "clamp(0.45rem, 2.2vw, 0.72rem)",
-                  transform: "rotate(-4deg)",
-                  display: "block",
-                  textAlign: "center",
-                  maxWidth: "100%",
-                  wordBreak: "break-word",
-                  lineHeight: 1.2,
-                }}
-              >
-                {line2}
-              </span>
-            )}
-          </div>
 
           {/* Spindle hole */}
           <div
@@ -299,6 +277,31 @@ function DiscSlot({
               background: "#07070e",
             }}
           />
+
+          {/* Bottom outer-ring text (overflow) */}
+          {line2 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "7%",
+                left: "12%",
+                right: "12%",
+                textAlign: "center",
+              }}
+            >
+              <span
+                className="font-marker text-[#111]"
+                style={{
+                  fontSize: "clamp(0.42rem, 2vw, 0.65rem)",
+                  transform: "rotate(3deg)",
+                  display: "block",
+                  lineHeight: 1.1,
+                }}
+              >
+                {line2}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
