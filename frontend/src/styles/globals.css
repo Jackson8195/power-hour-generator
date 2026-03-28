@@ -9,6 +9,21 @@
 }
 
 @layer components {
+  .scanlines::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.18) 2px,
+      rgba(0, 0, 0, 0.18) 4px
+    );
+  }
+
   .btn-primary {
     @apply inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2
            text-sm font-semibold text-white transition-colors
@@ -30,6 +45,15 @@
 
   .card {
     @apply rounded-xl border border-zinc-800 bg-zinc-900 p-4;
+  }
+}
+
+@layer utilities {
+  .glow-text {
+    text-shadow:
+      0 0 8px currentColor,
+      0 0 20px currentColor,
+      0 0 40px currentColor;
   }
 }
 
