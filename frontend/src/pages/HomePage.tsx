@@ -41,9 +41,6 @@ export default function HomePage() {
                 className="mt-2"
                 textClassName="font-retro text-4xl tracking-[0.22em] text-[#ff77c2] glow-text sm:text-5xl"
               />
-              <p className="mt-4 max-w-xl font-mono text-sm uppercase tracking-[0.22em] text-[#91fff2]/55">
-                Start a new project here. Existing edits and finished projects live in separate places now.
-              </p>
             </div>
           </div>
 
@@ -55,9 +52,6 @@ export default function HomePage() {
                   text="NAME YOUR MIXTAPE"
                   textClassName="font-retro text-2xl tracking-[0.2em] text-[#1affe4]"
                 />
-                <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
-                  Create a working project for collecting clips, tweaking ranges, and rendering outputs later.
-                </p>
 
                 <form onSubmit={handleCreate} className="mt-6 flex flex-col gap-4">
                   <div>
@@ -92,9 +86,6 @@ export default function HomePage() {
               <div className="retro-panel rounded-[24px] p-5">
                 <div className="relative z-10">
                   <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">WORKS IN PROGRESS</p>
-                  <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                    Open the edit library to keep building any existing project, even after it already has rendered outputs.
-                  </p>
                   <button
                     onClick={() => navigate("/works-in-progress")}
                     className="crt-action retro-button-secondary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
@@ -110,9 +101,6 @@ export default function HomePage() {
               <div className="retro-panel rounded-[24px] p-5">
                 <div className="relative z-10">
                   <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">FINISHED OUTPUTS</p>
-                  <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                    Insert Mixtape is now the playback shelf for finished rendered videos instead of the editing queue.
-                  </p>
                   <button
                     onClick={() => navigate("/mixtapes")}
                     className="crt-action retro-button-secondary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"

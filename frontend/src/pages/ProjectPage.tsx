@@ -348,6 +348,11 @@ export default function ProjectPage() {
                     style={{ width: `${renderProgress.progress}%` }}
                   />
                 </div>
+                {renderProgress.status === "rendering" && (
+                  <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+                    Estimated time 12 minutes. So this should take about 5 or 10 minutes.
+                  </p>
+                )}
                 {renderProgress.status === "complete" && renderProgress.output_path && (
                   <div className="mt-4 flex flex-wrap gap-3">
                     <a

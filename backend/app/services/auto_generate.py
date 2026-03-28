@@ -312,7 +312,7 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
                     step="Clipping recommended 60 seconds",
                     step_progress=0.82,
                 )
-                output_path = settings.media_dir / "clips" / f"{clip.youtube_id or f'clip_{clip.id}'}_{clip.id}.mp4"
+                output_path = settings.clips_dir / f"{clip.youtube_id or f'clip_{clip.id}'}_{clip.id}.mp4"
                 await extract_clip_segment(
                     source_path=str(source_file_path),
                     output_path=str(output_path),

@@ -9,7 +9,7 @@ from app.models.schemas import ClipDB, ClipResponse
 
 
 def analysis_file_path(clip_id: int) -> Path:
-    return settings.media_dir / "analysis" / f"clip_{clip_id}.json"
+    return settings.analysis_dir / f"clip_{clip_id}.json"
 
 
 def save_clip_analysis(clip_id: int, analysis: dict[str, Any]) -> None:

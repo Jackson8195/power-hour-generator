@@ -6,11 +6,11 @@ import {
   Sparkles,
   Wand2,
   CheckCircle2,
-  ArrowLeft,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import CrtStaticText from "../components/CrtStaticText";
+import BackButton from "../components/BackButton";
 import type { AutoGenerateProposal } from "../utils/types";
 import {
   approveAutoGenerateProposal,
@@ -124,19 +124,8 @@ export default function AutoGeneratePage() {
                   className="mt-2"
                   textClassName="font-retro text-4xl tracking-[0.18em] text-[#ff77c2] glow-text sm:text-5xl"
                 />
-                <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/50">
-                  Describe the vibe. AI proposes the playlist. You approve it. The app auto-selects and trims the best 60 seconds from each video.
-                </p>
               </div>
-              <button
-                onClick={() => navigate("/")}
-                className="crt-action retro-button-secondary inline-flex items-center gap-3 self-start rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="crt-action__label" data-text="BACK TO MENU">
-                  BACK TO MENU
-                </span>
-              </button>
+              <BackButton fallback="/" />
             </div>
 
             <div className="mt-6 flex min-h-[calc(100vh-17rem)] flex-col gap-6 xl:flex-row">
@@ -150,15 +139,24 @@ export default function AutoGeneratePage() {
                   <div className={promptPanelCollapsed ? "flex h-full flex-col items-center gap-4" : ""}>
                     <button
                       onClick={() => setPromptPanelCollapsed((current) => !current)}
-                      className="crt-action retro-button-secondary inline-flex items-center gap-2 self-start rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+                      className={[
+                        "crt-action retro-button-secondary inline-flex rounded-xl font-retro text-xs tracking-[0.16em]",
+                        promptPanelCollapsed
+                          ? "w-full items-center justify-center px-2 py-2"
+                          : "items-center gap-2 self-start px-3 py-2",
+                      ].join(" ")}
+                      aria-label={promptPanelCollapsed ? "Open panel" : "Collapse panel"}
+                      title={promptPanelCollapsed ? "Open panel" : "Collapse panel"}
                     >
                       {promptPanelCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-                      <span
-                        className="crt-action__label"
-                        data-text={promptPanelCollapsed ? "OPEN PANEL" : "COLLAPSE PANEL"}
-                      >
-                        {promptPanelCollapsed ? "OPEN PANEL" : "COLLAPSE PANEL"}
-                      </span>
+                      {!promptPanelCollapsed ? (
+                        <span
+                          className="crt-action__label"
+                          data-text="COLLAPSE PANEL"
+                        >
+                          COLLAPSE PANEL
+                        </span>
+                      ) : null}
                     </button>
 
                     {promptPanelCollapsed ? (
@@ -188,9 +186,6 @@ export default function AutoGeneratePage() {
                           text="STEP 1 · DESCRIBE THE MIX"
                           textClassName="font-retro text-2xl tracking-[0.18em] text-[#1affe4]"
                         />
-                        <p className="mt-3 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
-                          Example: high-energy 2000s pop-punk power hour with sing-along choruses and iconic music videos.
-                        </p>
 
                         <textarea
                           value={prompt}
@@ -213,14 +208,6 @@ export default function AutoGeneratePage() {
                           </button>
                         </div>
 
-                        <div className="mt-6 rounded-[20px] border border-[#1affe4]/10 bg-[#08131a]/90 p-4">
-                          <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">HOW THIS WORKS</p>
-                          <ul className="mt-3 space-y-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                            <li>AI proposes a 60-song playlist from your prompt.</li>
-                            <li>You can replace individual songs before approving.</li>
-                            <li>Approval creates a project and starts auto-trimming clips immediately.</li>
-                          </ul>
-                        </div>
                       </>
                     )}
                   </div>
@@ -255,9 +242,6 @@ export default function AutoGeneratePage() {
                     <div className="mt-4 rounded-xl border border-[#ff77c2]/20 bg-[#200815]/70 px-4 py-3">
                       <p className="font-retro text-sm tracking-[0.18em] text-[#ffb6dd]">
                         BACKGROUND GENERATION IN PROGRESS
-                      </p>
-                      <p className="mt-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                        Resume the current AI build at any time while it keeps working in the background.
                       </p>
                       <button
                         onClick={() => navigate(`/auto-generate/progress/${activeJob.jobId}`)}
@@ -296,32 +280,30 @@ export default function AutoGeneratePage() {
                         </button>
                       </div>
 
-                      <div className="mt-4 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-4 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
-                        Prompt: {proposal.normalized_prompt}
-                      </div>
-
                       <div className="mt-5 flex-1 space-y-3 overflow-y-auto pr-1">
                         {proposal.items.map((item) => (
                           <div
                             key={`${proposal.proposal_id}-${item.slot_index}`}
                             className="retro-project-card rounded-[20px] p-4"
                           >
-                            <div className="relative z-10 flex items-start gap-4">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#1affe4]/12 bg-[#08131a] font-retro text-xs tracking-[0.18em] text-[#91fff2]/70">
-                                {item.slot_index + 1}
-                              </div>
-                              {item.thumbnail ? (
-                                <img
-                                  src={item.thumbnail}
-                                  alt={item.title || item.requested_title}
-                                  className="h-16 w-28 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
-                                />
-                              ) : (
-                                <div className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-[#08131a] font-retro text-xs tracking-[0.18em] text-[#ff77c2]/60">
-                                  PENDING
+                            <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start">
+                              <div className="flex min-w-0 items-start gap-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#1affe4]/12 bg-[#08131a] font-retro text-xs tracking-[0.18em] text-[#91fff2]/70">
+                                  {item.slot_index + 1}
                                 </div>
-                              )}
-                              <div className="min-w-0 flex-1">
+                                {item.thumbnail ? (
+                                  <img
+                                    src={item.thumbnail}
+                                    alt={item.title || item.requested_title}
+                                    className="h-16 w-28 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
+                                  />
+                                ) : (
+                                  <div className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-[#08131a] font-retro text-xs tracking-[0.18em] text-[#ff77c2]/60">
+                                    PENDING
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1 overflow-hidden">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">
                                     {item.title || item.requested_title}
@@ -332,11 +314,11 @@ export default function AutoGeneratePage() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/55">
+                                <p className="mt-1 truncate font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/55">
                                   {(item.artist || item.requested_artist || "Unresolved")} {item.duration ? `· ${item.duration}` : ""}
                                 </p>
                                 {item.reason ? (
-                                  <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/35">
+                                  <p className="mt-2 truncate font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/35">
                                     {item.reason}
                                   </p>
                                 ) : null}
@@ -349,7 +331,7 @@ export default function AutoGeneratePage() {
                               <button
                                 onClick={() => handleReplace(item.slot_index)}
                                 disabled={replacingSlots[item.slot_index] || generating || approving}
-                                className="crt-action retro-button-secondary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="crt-action retro-button-secondary inline-flex shrink-0 self-start items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40 lg:self-center"
                               >
                                 {replacingSlots[item.slot_index] ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -382,9 +364,6 @@ export default function AutoGeneratePage() {
                           <Wand2 className="h-10 w-10 text-[#ff77c2]/70" />
                           <p className="mt-4 font-retro text-2xl tracking-[0.18em] text-zinc-200">
                             NO PLAYLIST YET
-                          </p>
-                          <p className="mt-3 max-w-md font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/40">
-                            Enter a prompt on the left and generate a full 60-song proposal before approval.
                           </p>
                         </>
                       )}

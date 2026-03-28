@@ -1,13 +1,13 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Film, Disc3, Music4, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { Loader2, Film, Disc3, Music4, CheckCircle2, AlertTriangle } from "lucide-react";
 import CrtStaticText from "../components/CrtStaticText";
+import BackButton from "../components/BackButton";
 import { getAutoGenerateJob } from "../utils/api";
 import type { AutoGenerateJobProgress } from "../utils/types";
 
 export default function AutoGenerateProgressPage() {
   const { jobId = "" } = useParams<{ jobId: string }>();
-  const navigate = useNavigate();
   const [job, setJob] = useState<AutoGenerateJobProgress | null>(null);
   const [error, setError] = useState("");
 
@@ -73,15 +73,7 @@ export default function AutoGenerateProgressPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => navigate("/auto-generate")}
-                  className="crt-action retro-button-secondary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span className="crt-action__label" data-text="BACK TO AI MENU">
-                    BACK TO AI MENU
-                  </span>
-                </button>
+                <BackButton fallback="/auto-generate" />
                 {job?.project_id ? (
                   <Link
                     to={`/project/${job.project_id}`}

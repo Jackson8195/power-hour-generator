@@ -117,7 +117,7 @@ class RenderPipeline:
 
         # Create temp output for normalized clip
         suffix = Path(file_path).suffix or ".mp4"
-        tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir=str(settings.media_dir))
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir=str(settings.temp_dir))
         tmp.close()
 
         cmd = [
@@ -207,7 +207,7 @@ class RenderPipeline:
         """Concatenate using FFmpeg concat demuxer (fast, no re-encode)."""
         # Create concat file list
         concat_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False, dir=str(settings.media_dir)
+            mode="w", suffix=".txt", delete=False, dir=str(settings.temp_dir)
         )
         for path in clip_paths:
             concat_file.write(f"file '{path}'\n")

@@ -52,9 +52,6 @@ export default function WorksInProgressPage() {
                 className="mt-2"
                 textClassName="font-retro text-4xl tracking-[0.22em] text-[#ff77c2] glow-text sm:text-5xl"
               />
-              <p className="mt-4 max-w-xl font-mono text-sm uppercase tracking-[0.22em] text-[#91fff2]/55">
-                Every project stays here, even after it has rendered outputs, so you can revise clips and export again later.
-              </p>
             </div>
 
             <button
@@ -75,9 +72,6 @@ export default function WorksInProgressPage() {
                 text="PROJECT STACK"
                 textClassName="font-retro text-2xl tracking-[0.2em] text-zinc-200"
               />
-              <p className="mt-2 font-mono text-xs uppercase tracking-[0.18em] text-[#91fff2]/45">
-                Open any card to keep editing, trimming, and rendering new versions.
-              </p>
             </div>
             <p className="font-retro text-xs tracking-[0.32em] text-[#1affe4]/60">
               {loading ? "SYNCING..." : `${projects.length} LOADED`}
@@ -98,9 +92,6 @@ export default function WorksInProgressPage() {
                 text="NO ACTIVE PROJECTS"
                 textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
               />
-              <p className="mx-auto mt-4 max-w-xl font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
-                Start a new project to begin collecting clips for your next power hour.
-              </p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

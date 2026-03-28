@@ -5,6 +5,7 @@ import { Film, PlayCircle, FolderOpen, X } from "lucide-react";
 import type { RenderLibraryEntry } from "../utils/types";
 import { listRenderedVideos } from "../utils/api";
 import CrtStaticText from "../components/CrtStaticText";
+import BackButton from "../components/BackButton";
 
 const ITEMS_PER_PAGE = 4;
 const LAST_RENDER_STORAGE_KEY = "power-hour-last-mixtape-render";
@@ -88,18 +89,11 @@ export default function MixtapeBinderPage() {
 
       <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-6 pt-8 sm:px-8">
         <div className="flex items-center gap-6">
-          <button
-            onClick={() => navigate("/")}
-            className="crt-action font-retro text-xl tracking-widest text-zinc-500 transition-colors hover:text-zinc-200"
-          >
-            <span className="crt-action__label" data-text="◀ BACK">
-              ◀ BACK
-            </span>
-          </button>
+          <BackButton fallback="/" />
           <CrtStaticText
             as="h1"
             text="INSERT MIXTAPE"
-            textClassName="font-retro text-3xl tracking-widest text-zinc-200 sm:text-4xl"
+            textClassName="font-retro text-3xl tracking-widest text-[#ff77c2] glow-text sm:text-4xl"
           />
         </div>
 
@@ -130,9 +124,6 @@ export default function MixtapeBinderPage() {
               className="mt-6"
               textClassName="font-retro text-3xl tracking-[0.18em] text-[#ff9bd2]"
             />
-            <p className="mt-4 max-w-2xl font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
-              Render a project from the works in progress library and the finished video will appear here as a playable disc.
-            </p>
             <button
               onClick={() => navigate("/works-in-progress")}
               className="crt-action retro-button-primary mt-8 inline-flex items-center gap-3 rounded-xl px-5 py-3 font-retro text-sm tracking-[0.16em]"
@@ -156,9 +147,6 @@ export default function MixtapeBinderPage() {
                     className="mt-3"
                     textClassName="font-retro text-3xl tracking-[0.18em] text-[#ff9bd2] sm:text-4xl"
                   />
-                  <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
-                    The binder stays front and center here. Choose a finished CD first, then press play to drop it into the walkman before the viewer opens.
-                  </p>
                 </div>
 
                 <div className="mt-8">
@@ -215,7 +203,7 @@ export default function MixtapeBinderPage() {
                     <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
                       {selectedRender?.completed_at
                         ? `Rendered ${new Date(selectedRender.completed_at).toLocaleString()}`
-                        : "Choose a rendered disc from the binder"}
+                        : ""}
                     </p>
                     {selectedRender ? (
                       <button
@@ -275,14 +263,14 @@ export default function MixtapeBinderPage() {
 
       {viewerRender ? (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/92 px-4 py-6"
           onClick={closeViewer}
         >
           <div
-            className="retro-shell relative w-full max-w-6xl rounded-[28px] p-5 sm:p-6"
+            className="relative w-full max-w-6xl rounded-[28px] border border-[#1affe4]/10 bg-[#030608] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="relative z-10">
+            <div className="relative">
               <div className="flex items-start justify-between gap-4 border-b border-[#1affe4]/10 pb-4">
                 <div>
                   <p className="font-retro text-xs tracking-[0.32em] text-[#1affe4]/60">
@@ -367,6 +355,8 @@ export default function MixtapeBinderPage() {
                     src={viewerRender.output_url}
                     controls
                     autoPlay
+                    playsInline
+                    preload="auto"
                     className="max-h-[78vh] w-full bg-black object-contain"
                   />
                 )}

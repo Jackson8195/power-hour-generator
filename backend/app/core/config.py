@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Paths
     media_dir: Path = Path("./media")
-    render_dir: Path = Path("./static/renders")
+    render_dir: Path = Path("./media/renders")
     database_url: str = "sqlite+aiosqlite:///./power_hour.db"
 
     # Server
@@ -45,7 +45,27 @@ class Settings(BaseSettings):
     def ensure_dirs(self):
         """Create media and render directories if they don't exist."""
         self.media_dir.mkdir(parents=True, exist_ok=True)
+        self.downloads_dir.mkdir(parents=True, exist_ok=True)
+        self.clips_dir.mkdir(parents=True, exist_ok=True)
+        self.analysis_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.render_dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def downloads_dir(self) -> Path:
+        return self.media_dir / "downloads"
+
+    @property
+    def clips_dir(self) -> Path:
+        return self.media_dir / "clips"
+
+    @property
+    def analysis_dir(self) -> Path:
+        return self.media_dir / "analysis"
+
+    @property
+    def temp_dir(self) -> Path:
+        return self.media_dir / "temp"
 
 
 settings = Settings()

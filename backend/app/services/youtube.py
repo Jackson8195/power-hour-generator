@@ -261,7 +261,7 @@ async def download_video(
     quality: Optional[int] = None,
 ) -> dict:
     """Download a YouTube video using yt-dlp."""
-    output_dir = output_dir or settings.media_dir
+    output_dir = output_dir or settings.downloads_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     quality = quality or settings.default_video_quality
 

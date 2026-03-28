@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/clips", tags=["clips"])
 
 def _clip_output_path(clip_id: int, youtube_id: str) -> Path:
     safe_stem = youtube_id or f"clip_{clip_id}"
-    return settings.media_dir / "clips" / f"{safe_stem}_{clip_id}.mp4"
+    return settings.clips_dir / f"{safe_stem}_{clip_id}.mp4"
 
 
 def _remove_media_file(file_path: str) -> None:
