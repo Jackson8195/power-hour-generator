@@ -41,8 +41,10 @@ def media_url_for_path(file_path: str) -> str:
 
 
 def serialize_clip(clip: ClipDB) -> ClipResponse:
+    from pathlib import Path
     data = ClipResponse.model_validate(clip).model_dump()
     data["file_path"] = ""
     data["preview_url"] = media_url_for_path(clip.file_path)
     data["has_selection"] = bool(clip.file_path and clip.end_time > clip.start_time)
+    data["file_missing"] = bool(clip.file_path and not Path(clip.file_path).exists())
     return ClipResponse(**data)

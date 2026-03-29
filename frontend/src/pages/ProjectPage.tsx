@@ -685,6 +685,11 @@ function ClipReviewCard({
                 Clipped
               </span>
             )}
+            {clip.file_missing && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-red-400">
+                ⚠ File Missing
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
             <span>{clip.source_artist}</span>

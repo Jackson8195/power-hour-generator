@@ -31,6 +31,7 @@ export interface Clip {
   status: ClipStatus;
   preview_url: string;
   has_selection: boolean;
+  file_missing: boolean;
 }
 
 export interface Project {

@@ -147,6 +147,7 @@ class ClipResponse(BaseModel):
     status: ClipStatus
     preview_url: str = ""
     has_selection: bool = False
+    file_missing: bool = False
 
     model_config = {"from_attributes": True}
 
