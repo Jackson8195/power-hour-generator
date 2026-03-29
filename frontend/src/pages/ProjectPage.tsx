@@ -56,6 +56,7 @@ export default function ProjectPage() {
   const [searching, setSearching] = useState(false);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"search" | "timeline">("search");
   const [expandedClipId, setExpandedClipId] = useState<number | null>(null);
   const [analysisByClip, setAnalysisByClip] = useState<Record<number, ClipAnalysis>>({});
@@ -256,6 +257,7 @@ export default function ProjectPage() {
   }
 
   async function handleStartRender() {
+    setRenderError(null);
     try {
       const { render_id } = await startRender(projectId);
       const ws = connectRenderWs(render_id, (data) => {
@@ -264,8 +266,9 @@ export default function ProjectPage() {
           ws.close();
         }
       });
-    } catch (err) {
-      console.error("Render failed:", err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Render failed";
+      setRenderError(msg);
     }
   }
 
@@ -319,6 +322,13 @@ export default function ProjectPage() {
               </span>
             </button>
           </div>
+
+          {renderError && (
+            <div className="retro-panel mb-6 rounded-[22px] p-5">
+              <p className="font-retro text-sm tracking-[0.18em] text-red-400">RENDER FAILED</p>
+              <p className="mt-2 font-mono text-xs tracking-[0.14em] text-[#ffb6dd]/80">{renderError}</p>
+            </div>
+          )}
 
           {renderProgress && (
             <div className="retro-panel mb-6 rounded-[22px] p-5">

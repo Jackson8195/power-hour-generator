@@ -59,6 +59,14 @@ async def start_render(
     if not ready_clips:
         raise HTTPException(status_code=400, detail="No reviewed clips with a selected range to render")
 
+    from pathlib import Path
+    missing = [c.source_title or f"Clip {c.id}" for c in ready_clips if not Path(c.file_path).exists()]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing media files for: {', '.join(missing)}. Delete and re-add these clips.",
+        )
+
     ready_clips.sort(key=lambda c: c.position)
 
     # Create render record
