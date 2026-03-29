@@ -845,7 +845,7 @@ function ClipReviewCard({
                     </button>
                     <button
                       onClick={onCommit}
-                      disabled={!hasValidSelection || committing || saving}
+                      disabled={!hasValidSelection || committing || saving || committedClip}
                       className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {committing ? (
