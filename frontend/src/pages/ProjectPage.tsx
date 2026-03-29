@@ -846,15 +846,18 @@ function ClipReviewCard({
                     <button
                       onClick={onCommit}
                       disabled={!hasValidSelection || committing || saving || committedClip}
-                      className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      className={committedClip
+                        ? "inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] border border-green-500/20 bg-green-500/5 text-green-400/50 cursor-not-allowed"
+                        : "crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      }
                     >
                       {committing ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Scissors className="h-3.5 w-3.5" />
                       )}
-                      <span className="crt-action__label" data-text="TRIM AND DISCARD FULL VIDEO">
-                        TRIM AND DISCARD FULL VIDEO
+                      <span className="crt-action__label" data-text={committedClip ? "CLIP TRIMMED!" : "TRIM AND DISCARD FULL VIDEO"}>
+                        {committedClip ? "CLIP TRIMMED!" : "TRIM AND DISCARD FULL VIDEO"}
                       </span>
                     </button>
                   </div>
