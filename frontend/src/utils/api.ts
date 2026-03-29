@@ -212,6 +212,16 @@ export async function listRenderedVideos(): Promise<RenderLibraryEntry[]> {
   return request("/api/render/library");
 }
 
+export async function getActiveRender(
+  projectId: number
+): Promise<{ render_id: number; status: string } | null> {
+  return request(`/api/render/active/${projectId}`);
+}
+
+export async function cancelRender(renderId: number): Promise<void> {
+  return request(`/api/render/${renderId}`, { method: "DELETE" });
+}
+
 export function connectRenderWs(
   renderId: number,
   onMessage: (data: RenderProgress) => void

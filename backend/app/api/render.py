@@ -21,8 +21,9 @@ from app.services.ffmpeg import RenderPipeline
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/render", tags=["render"])
 
-# Active render progress tracking
+# Active render progress and task tracking
 _render_progress: dict[int, float] = {}
+_render_tasks: dict[int, asyncio.Task] = {}
 
 
 def _build_output_path(project_name: str, project_id: int, render_id: int) -> Path:
@@ -97,7 +98,8 @@ async def start_render(
     ]
 
     # Start render in background
-    asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request))
+    task = asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request))
+    _render_tasks[render_id] = task
 
     return {"render_id": render_id, "status": "queued"}
 
@@ -139,6 +141,13 @@ async def _run_render(
             render.completed_at = datetime.utcnow()
             await db.commit()
 
+        except asyncio.CancelledError:
+            logger.info(f"Render {render_id} cancelled.")
+            render.status = RenderStatus.ERROR
+            render.error_message = "Cancelled by user."
+            Path(output_path).unlink(missing_ok=True)
+            await db.commit()
+
         except Exception as e:
             logger.error(f"Render {render_id} failed: {e}")
             render.status = RenderStatus.ERROR
@@ -147,6 +156,7 @@ async def _run_render(
 
         finally:
             _render_progress.pop(render_id, None)
+            _render_tasks.pop(render_id, None)
 
 
 @router.get("/{render_id}/status", response_model=RenderProgress)
@@ -165,6 +175,42 @@ async def render_status(render_id: int, db: AsyncSession = Depends(get_db)):
         output_path=_build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
         error_message=render.error_message if render.status == RenderStatus.ERROR else "",
     )
+
+
+@router.get("/active/{project_id}")
+async def get_active_render(project_id: int, db: AsyncSession = Depends(get_db)):
+    """Return the in-progress render for a project, if any."""
+    result = await db.execute(
+        select(RenderDB)
+        .where(RenderDB.project_id == project_id)
+        .where(RenderDB.status.in_([RenderStatus.QUEUED, RenderStatus.RENDERING]))
+        .order_by(RenderDB.id.desc())
+    )
+    render = result.scalar_one_or_none()
+    if not render:
+        return None
+    return {"render_id": render.id, "status": render.status}
+
+
+@router.delete("/{render_id}")
+async def cancel_render(render_id: int, db: AsyncSession = Depends(get_db)):
+    """Cancel a running render and delete the partial output file."""
+    task = _render_tasks.pop(render_id, None)
+    if task:
+        task.cancel()
+
+    result = await db.execute(select(RenderDB).where(RenderDB.id == render_id))
+    render = result.scalar_one_or_none()
+    if not render:
+        raise HTTPException(status_code=404, detail="Render not found")
+
+    if render.output_path:
+        Path(render.output_path).unlink(missing_ok=True)
+    render.status = RenderStatus.ERROR
+    render.error_message = "Cancelled by user."
+    await db.commit()
+
+    return {"status": "cancelled"}
 
 
 @router.get("/library", response_model=list[RenderLibraryEntry])

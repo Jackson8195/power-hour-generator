@@ -22,9 +22,11 @@ import type {
 } from "../utils/types";
 import {
   addClip,
+  cancelRender,
   commitClipSelection,
   connectRenderWs,
   deleteClip,
+  getActiveRender,
   getClipAnalysis,
   getRecommendedTracks,
   getProject,
@@ -57,6 +59,8 @@ export default function ProjectPage() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [activeRenderId, setActiveRenderId] = useState<number | null>(null);
+  const renderWsRef = useRef<WebSocket | null>(null);
   const [activeTab, setActiveTab] = useState<"search" | "timeline">("search");
   const [expandedClipId, setExpandedClipId] = useState<number | null>(null);
   const [analysisByClip, setAnalysisByClip] = useState<Record<number, ClipAnalysis>>({});
@@ -115,6 +119,26 @@ export default function ProjectPage() {
     const interval = setInterval(loadProject, 3000);
     return () => clearInterval(interval);
   }, [project, loadProject]);
+
+  function connectToRender(renderId: number) {
+    renderWsRef.current?.close();
+    setActiveRenderId(renderId);
+    const ws = connectRenderWs(renderId, (data) => {
+      setRenderProgress(data);
+      if (data.status === "complete" || data.status === "error") {
+        ws.close();
+        setActiveRenderId(null);
+      }
+    });
+    renderWsRef.current = ws;
+  }
+
+  useEffect(() => {
+    getActiveRender(projectId).then((active) => {
+      if (active) connectToRender(active.render_id);
+    }).catch(() => {});
+    return () => renderWsRef.current?.close();
+  }, [projectId]);
 
   async function ensureAnalysis(clipId: number) {
     if (analysisByClip[clipId] || loadingAnalysis[clipId]) {
@@ -258,17 +282,25 @@ export default function ProjectPage() {
 
   async function handleStartRender() {
     setRenderError(null);
+    setRenderProgress(null);
     try {
       const { render_id } = await startRender(projectId);
-      const ws = connectRenderWs(render_id, (data) => {
-        setRenderProgress(data);
-        if (data.status === "complete" || data.status === "error") {
-          ws.close();
-        }
-      });
+      connectToRender(render_id);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Render failed";
       setRenderError(msg);
+    }
+  }
+
+  async function handleCancelRender() {
+    if (!activeRenderId) return;
+    try {
+      await cancelRender(activeRenderId);
+      renderWsRef.current?.close();
+      setActiveRenderId(null);
+      setRenderProgress(null);
+    } catch (err) {
+      console.error("Failed to cancel render:", err);
     }
   }
 
@@ -359,9 +391,18 @@ export default function ProjectPage() {
                   />
                 </div>
                 {renderProgress.status === "rendering" && (
-                  <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
-                    Estimated time 12 minutes. So this should take about 5 or 10 minutes.
-                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+                      Estimated time 12 minutes. So this should take about 5 or 10 minutes.
+                    </p>
+                    <button
+                      onClick={handleCancelRender}
+                      className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 font-retro text-xs tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      CANCEL
+                    </button>
+                  </div>
                 )}
                 {renderProgress.status === "complete" && renderProgress.output_path && (
                   <div className="mt-4 flex flex-wrap gap-3">
