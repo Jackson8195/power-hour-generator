@@ -151,9 +151,9 @@ class RenderPipeline:
         # Add countdown overlay if enabled
         if self.include_countdown:
             countdown_filter = self._build_countdown_filter(duration)
-            # Insert countdown into the video filter chain
-            vf_idx = cmd.index("-vf") + 1
-            cmd[vf_idx] = cmd[vf_idx] + "," + countdown_filter
+            if countdown_filter:
+                vf_idx = cmd.index("-vf") + 1
+                cmd[vf_idx] = cmd[vf_idx] + "," + countdown_filter
 
         proc = await asyncio.create_subprocess_exec(
             *cmd,
