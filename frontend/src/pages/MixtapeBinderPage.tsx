@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { Film, PlayCircle, FolderOpen, X } from "lucide-react";
+import { Film, PlayCircle, FolderOpen, Trash2, X } from "lucide-react";
 import type { RenderLibraryEntry } from "../utils/types";
-import { listRenderedVideos } from "../utils/api";
+import { listRenderedVideos, cancelRender } from "../utils/api";
 import CrtStaticText from "../components/CrtStaticText";
 import BackButton from "../components/BackButton";
 
@@ -81,6 +81,13 @@ export default function MixtapeBinderPage() {
     setViewerRenderId(null);
     setViewerStage("loading");
     setAnimatingRenderId(null);
+  }
+
+  async function handleDeleteRender(renderId: number) {
+    await cancelRender(renderId);
+    setRenders((prev) => prev.filter((r) => r.render_id !== renderId));
+    if (selectedRenderId === renderId) setSelectedRenderId(null);
+    if (viewerRenderId === renderId) closeViewer();
   }
 
   return (
@@ -206,16 +213,25 @@ export default function MixtapeBinderPage() {
                         : ""}
                     </p>
                     {selectedRender ? (
-                      <button
-                        onClick={() => startPlayback(selectedRender.render_id)}
-                        disabled={animatingRenderId !== null}
-                        className="crt-action retro-button-primary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <PlayCircle className="h-4 w-4" />
-                        <span className="crt-action__label" data-text="PLAY MIXTAPE">
-                          PLAY MIXTAPE
-                        </span>
-                      </button>
+                      <div className="mt-5 flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => startPlayback(selectedRender.render_id)}
+                          disabled={animatingRenderId !== null}
+                          className="crt-action retro-button-primary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                          <span className="crt-action__label" data-text="PLAY MIXTAPE">
+                            PLAY MIXTAPE
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRender(selectedRender.render_id)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-3 font-retro text-xs tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
+                          title="Delete this render"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 </div>

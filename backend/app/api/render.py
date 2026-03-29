@@ -143,10 +143,7 @@ async def _run_render(
 
         except asyncio.CancelledError:
             logger.info(f"Render {render_id} cancelled.")
-            render.status = RenderStatus.ERROR
-            render.error_message = "Cancelled by user."
             Path(output_path).unlink(missing_ok=True)
-            await db.commit()
 
         except Exception as e:
             logger.error(f"Render {render_id} failed: {e}")
@@ -194,7 +191,7 @@ async def get_active_render(project_id: int, db: AsyncSession = Depends(get_db))
 
 @router.delete("/{render_id}")
 async def cancel_render(render_id: int, db: AsyncSession = Depends(get_db)):
-    """Cancel a running render and delete the partial output file."""
+    """Cancel a running render or delete a completed one. Removes the file and DB row."""
     task = _render_tasks.pop(render_id, None)
     if task:
         task.cancel()
@@ -206,11 +203,11 @@ async def cancel_render(render_id: int, db: AsyncSession = Depends(get_db)):
 
     if render.output_path:
         Path(render.output_path).unlink(missing_ok=True)
-    render.status = RenderStatus.ERROR
-    render.error_message = "Cancelled by user."
+
+    await db.delete(render)
     await db.commit()
 
-    return {"status": "cancelled"}
+    return {"status": "deleted"}
 
 
 @router.get("/library", response_model=list[RenderLibraryEntry])
