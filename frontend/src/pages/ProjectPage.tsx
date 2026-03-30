@@ -30,12 +30,14 @@ import {
   getClipAnalysis,
   getRecommendedTracks,
   getProject,
+  reorderClips,
   searchYouTube,
   startDownload,
   startRender,
   updateClip,
   useSuggestedSegment,
 } from "../utils/api";
+import ClipTimeline from "../components/ClipTimeline";
 import clsx from "clsx";
 import CrtStaticText from "../components/CrtStaticText";
 
@@ -61,7 +63,7 @@ export default function ProjectPage() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<number | null>(null);
   const renderWsRef = useRef<WebSocket | null>(null);
-  const [activeTab, setActiveTab] = useState<"search" | "timeline">("search");
+  const [activeTab, setActiveTab] = useState<"search" | "timeline" | "reorder">("search");
   const [expandedClipId, setExpandedClipId] = useState<number | null>(null);
   const [analysisByClip, setAnalysisByClip] = useState<Record<number, ClipAnalysis>>({});
   const [loadingAnalysis, setLoadingAnalysis] = useState<Record<number, boolean>>({});
@@ -198,6 +200,19 @@ export default function ProjectPage() {
       setRecommendedResults((prev) => prev.filter((r) => r.youtube_id !== result.youtube_id));
     } catch (err) {
       console.error("Failed to add clip:", err);
+    }
+  }
+
+  async function handleReorder(clipIds: number[]) {
+    if (!project) return;
+    // Optimistically reorder in UI
+    const reordered = clipIds.map((id) => project.clips.find((c) => c.id === id)!);
+    setProject({ ...project, clips: reordered });
+    try {
+      await reorderClips(project.id, clipIds);
+    } catch (err) {
+      console.error("Failed to reorder clips:", err);
+      await loadProject();
     }
   }
 
@@ -462,6 +477,22 @@ export default function ProjectPage() {
                 </span>
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab("reorder")}
+              className={clsx(
+                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
+                activeTab === "reorder"
+                  ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
+                  : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
+              )}
+            >
+              <span className="inline-flex items-center gap-2">
+                <GripVertical className="h-4 w-4" />
+                <span className="crt-action__label" data-text="REORDER">
+                  REORDER
+                </span>
+              </span>
+            </button>
           </div>
 
           {activeTab === "search" && (
@@ -579,6 +610,31 @@ export default function ProjectPage() {
           )}
             </div>
           )}
+
+          {activeTab === "reorder" && (
+            <div className="space-y-3">
+              {project.clips.length === 0 ? (
+                <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
+                  <CrtStaticText
+                    as="p"
+                    text="NO CLIPS YET"
+                    textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
+                  />
+                </div>
+              ) : (
+                <ClipTimeline
+                  clips={project.clips}
+                  onReorder={handleReorder}
+                  onDelete={handleDeleteClip}
+                  onUseSuggestion={(clipId) => {
+                    const clip = project.clips.find((c) => c.id === clipId);
+                    if (clip) handleUseSuggestion(clip);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
         </div>
       </section>
     </div>
