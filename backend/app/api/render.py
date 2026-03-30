@@ -249,7 +249,9 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                 await websocket.send_json({
                     "render_id": render_id,
                     "progress": progress,
-                    "status": "rendering",
+                    "status": RenderStatus.RENDERING.value,
+                    "output_path": "",
+                    "error_message": "",
                 })
             else:
                 # Check if render is complete or errored
@@ -264,6 +266,7 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                             "progress": render.progress,
                             "status": render.status.value,
                             "output_path": _build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
+                            "error_message": render.error_message or "" if render.status == RenderStatus.ERROR else "",
                         })
                         if render.status in (RenderStatus.COMPLETE, RenderStatus.ERROR):
                             break

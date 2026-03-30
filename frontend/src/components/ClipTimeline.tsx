@@ -1,4 +1,4 @@
-import {} from "react";
+import type React from "react";
 import {
   DndContext,
   closestCenter,
