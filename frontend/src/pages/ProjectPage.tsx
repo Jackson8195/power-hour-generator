@@ -1,4 +1,20 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useParams } from "react-router-dom";
 import {
   Search,
@@ -37,7 +53,6 @@ import {
   updateClip,
   useSuggestedSegment,
 } from "../utils/api";
-import ClipTimeline from "../components/ClipTimeline";
 import clsx from "clsx";
 import CrtStaticText from "../components/CrtStaticText";
 
@@ -63,7 +78,11 @@ export default function ProjectPage() {
   const [renderError, setRenderError] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<number | null>(null);
   const renderWsRef = useRef<WebSocket | null>(null);
-  const [activeTab, setActiveTab] = useState<"search" | "timeline" | "reorder">("search");
+  const [activeTab, setActiveTab] = useState<"search" | "timeline">("search");
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   const [expandedClipId, setExpandedClipId] = useState<number | null>(null);
   const [analysisByClip, setAnalysisByClip] = useState<Record<number, ClipAnalysis>>({});
   const [loadingAnalysis, setLoadingAnalysis] = useState<Record<number, boolean>>({});
@@ -201,6 +220,18 @@ export default function ProjectPage() {
     } catch (err) {
       console.error("Failed to add clip:", err);
     }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    if (!project) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = project.clips.findIndex((c) => c.id === active.id);
+    const newIndex = project.clips.findIndex((c) => c.id === over.id);
+    const reordered = [...project.clips];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    handleReorder(reordered.map((c) => c.id));
   }
 
   async function handleReorder(clipIds: number[]) {
@@ -477,22 +508,6 @@ export default function ProjectPage() {
                 </span>
               </span>
             </button>
-            <button
-              onClick={() => setActiveTab("reorder")}
-              className={clsx(
-                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
-                activeTab === "reorder"
-                  ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
-                  : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
-              )}
-            >
-              <span className="inline-flex items-center gap-2">
-                <GripVertical className="h-4 w-4" />
-                <span className="crt-action__label" data-text="REORDER">
-                  REORDER
-                </span>
-              </span>
-            </button>
           </div>
 
           {activeTab === "search" && (
@@ -574,45 +589,6 @@ export default function ProjectPage() {
 
           {activeTab === "timeline" && (
             <div className="space-y-3">
-          {project.clips.length === 0 ? (
-            <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
-              <CrtStaticText
-                as="p"
-                text="NO CLIPS YET"
-                textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
-              />
-              <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
-                Search and add songs to begin the review flow.
-              </p>
-            </div>
-          ) : (
-            project.clips.map((clip, index) => (
-              <ClipReviewCard
-                key={clip.id}
-                clip={clip}
-                index={index}
-                expanded={expandedClipId === clip.id}
-                analysis={analysisByClip[clip.id]}
-                draft={draftRanges[clip.id]}
-                loadingAnalysis={loadingAnalysis[clip.id] ?? false}
-                saving={savingClipIds[clip.id] ?? false}
-                committing={committingClipIds[clip.id] ?? false}
-                onExpand={() => handleExpandClip(clip)}
-                onDelete={() => handleDeleteClip(clip.id)}
-                onUseSuggestion={() => handleUseSuggestion(clip)}
-                onSaveDraft={() => handleSaveDraft(clip)}
-                onCommit={() => handleCommitSelection(clip)}
-                onDraftChange={(range) =>
-                  setDraftRanges((prev) => ({ ...prev, [clip.id]: range }))
-                }
-              />
-            ))
-          )}
-            </div>
-          )}
-
-          {activeTab === "reorder" && (
-            <div className="space-y-3">
               {project.clips.length === 0 ? (
                 <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
                   <CrtStaticText
@@ -620,17 +596,36 @@ export default function ProjectPage() {
                     text="NO CLIPS YET"
                     textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
                   />
+                  <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
+                    Search and add songs to begin the review flow.
+                  </p>
                 </div>
               ) : (
-                <ClipTimeline
-                  clips={project.clips}
-                  onReorder={handleReorder}
-                  onDelete={handleDeleteClip}
-                  onUseSuggestion={(clipId) => {
-                    const clip = project.clips.find((c) => c.id === clipId);
-                    if (clip) handleUseSuggestion(clip);
-                  }}
-                />
+                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={project.clips.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                    {project.clips.map((clip, index) => (
+                      <ClipReviewCard
+                        key={clip.id}
+                        clip={clip}
+                        index={index}
+                        expanded={expandedClipId === clip.id}
+                        analysis={analysisByClip[clip.id]}
+                        draft={draftRanges[clip.id]}
+                        loadingAnalysis={loadingAnalysis[clip.id] ?? false}
+                        saving={savingClipIds[clip.id] ?? false}
+                        committing={committingClipIds[clip.id] ?? false}
+                        onExpand={() => handleExpandClip(clip)}
+                        onDelete={() => handleDeleteClip(clip.id)}
+                        onUseSuggestion={() => handleUseSuggestion(clip)}
+                        onSaveDraft={() => handleSaveDraft(clip)}
+                        onCommit={() => handleCommitSelection(clip)}
+                        onDraftChange={(range) =>
+                          setDraftRanges((prev) => ({ ...prev, [clip.id]: range }))
+                        }
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           )}
@@ -728,6 +723,8 @@ function ClipReviewCard({
   onCommit: () => void;
   onDraftChange: (range: DraftRange) => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: clip.id });
+  const dragStyle = { transform: CSS.Transform.toString(transform), transition };
   const videoRef = useRef<HTMLVideoElement>(null);
   const selection = draft ?? { start: clip.start_time, end: clip.end_time };
   const maxDuration = analysis?.duration || clip.duration || 0;
@@ -751,13 +748,24 @@ function ClipReviewCard({
 
   return (
     <div
+      ref={setNodeRef}
+      style={dragStyle}
       className={clsx(
         "retro-project-card overflow-hidden rounded-[22px] p-4",
-        committedClip && "border-l-2 border-l-green-500"
+        committedClip && "border-l-2 border-l-green-500",
+        isDragging && "opacity-50"
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="flex w-8 shrink-0 items-center justify-center">
+        <button
+          {...attributes}
+          {...listeners}
+          className="shrink-0 cursor-grab touch-none text-[#91fff2]/25 hover:text-[#91fff2]/60 active:cursor-grabbing"
+          tabIndex={-1}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex w-6 shrink-0 items-center justify-center">
           <span className="font-retro text-xs tracking-[0.2em] text-[#91fff2]/45">{index + 1}</span>
         </div>
 
