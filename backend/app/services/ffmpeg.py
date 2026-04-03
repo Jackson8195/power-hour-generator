@@ -5,7 +5,9 @@ and final concatenation into a Power Hour video.
 """
 
 import asyncio
+import json
 import logging
+import re
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional
@@ -115,6 +117,23 @@ class RenderPipeline:
         end_time = clip.get("end_time", 60)
         duration = end_time - start_time
 
+        # Two-pass loudnorm: measure first so pass 2 can use linear=true (no look-ahead
+        # buffer delay), which keeps audio and video in sync. Fall back to single-pass
+        # if the measurement fails for any reason.
+        loudnorm_stats = await self._measure_loudnorm(file_path, start_time, duration)
+        if loudnorm_stats:
+            af_filter = (
+                "loudnorm=I=-16:TP=-1.5:LRA=11"
+                f":measured_I={loudnorm_stats['input_i']}"
+                f":measured_LRA={loudnorm_stats['input_lra']}"
+                f":measured_TP={loudnorm_stats['input_tp']}"
+                f":measured_thresh={loudnorm_stats['input_thresh']}"
+                f":offset={loudnorm_stats['target_offset']}"
+                ":linear=true"
+            )
+        else:
+            af_filter = "loudnorm=I=-16:TP=-1.5:LRA=11"
+
         # Create temp output for normalized clip
         suffix = Path(file_path).suffix or ".mp4"
         tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir=str(settings.temp_dir))
@@ -132,8 +151,8 @@ class RenderPipeline:
                 f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2:black,"
                 "setsar=1"
             ),
-            # Audio: normalize loudness
-            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+            # Audio: normalize loudness (two-pass when possible to avoid A/V sync drift)
+            "-af", af_filter,
             # Codec settings
             "-c:v", "libx264",
             "-preset", "medium",
@@ -167,6 +186,57 @@ class RenderPipeline:
             raise RuntimeError(f"Failed to normalize clip: {file_path}")
 
         return tmp.name
+
+    async def _measure_loudnorm(self, file_path: str, start_time: float, duration: float) -> "dict | None":
+        """Run loudnorm pass 1 (audio-only) to measure loudness stats for a clip segment.
+
+        Returns a dict with keys input_i, input_lra, input_tp, input_thresh, target_offset,
+        or None if measurement fails (caller should fall back to single-pass loudnorm).
+        """
+        cmd = [
+            settings.ffmpeg_path,
+            "-y",
+            "-ss", str(start_time),
+            "-i", file_path,
+            "-t", str(duration),
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json",
+            "-vn",
+            "-f", "null",
+            "-",
+        ]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+        except Exception as e:
+            logger.warning(f"loudnorm pass 1 subprocess error for {file_path}: {e}")
+            return None
+
+        if proc.returncode != 0:
+            logger.warning(f"loudnorm pass 1 failed for {file_path}: {stderr.decode()[-300:]}")
+            return None
+
+        stderr_text = stderr.decode(errors="replace")
+        matches = re.findall(r'\{[^{}]+\}', stderr_text, re.DOTALL)
+        if not matches:
+            logger.warning(f"loudnorm pass 1 produced no JSON for {file_path}")
+            return None
+
+        try:
+            data = json.loads(matches[-1])
+        except json.JSONDecodeError as e:
+            logger.warning(f"loudnorm pass 1 JSON parse error for {file_path}: {e}")
+            return None
+
+        required = {"input_i", "input_lra", "input_tp", "input_thresh", "target_offset"}
+        if not required.issubset(data.keys()):
+            logger.warning(f"loudnorm pass 1 missing keys for {file_path}: got {set(data.keys())}")
+            return None
+
+        return data
 
     def _build_countdown_filter(self, clip_duration: float) -> str:
         """Build FFmpeg drawtext filter for countdown overlay."""
