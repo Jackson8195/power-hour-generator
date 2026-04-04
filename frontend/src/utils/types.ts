@@ -132,3 +132,19 @@ export interface AutoGenerateJobProgress {
   error_message: string;
   updated_at: string;
 }
+
+export interface AutoGenerateProposalJobStart {
+  proposal_job_id: string;
+}
+
+export interface AutoGenerateReplaceJobStart {
+  replace_job_id: string;
+}
+
+export interface AutoGenerateProposalJobStatus {
+  job_id: string;
+  status: "pending" | "complete" | "error";
+  error_message: string;
+  proposal: AutoGenerateProposal | null;
+  updated_at: string;
+}

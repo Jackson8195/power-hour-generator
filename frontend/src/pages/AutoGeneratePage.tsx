@@ -14,8 +14,9 @@ import BackButton from "../components/BackButton";
 import type { AutoGenerateProposal } from "../utils/types";
 import {
   approveAutoGenerateProposal,
-  createAutoGenerateProposal,
-  replaceAutoGenerateProposalItem,
+  getAutoGenerateProposalJob,
+  startAutoGenerateProposal,
+  startReplaceAutoGenerateProposalItem,
 } from "../utils/api";
 
 function formatSearchSourceLabel(source: string): string {
@@ -59,10 +60,20 @@ export default function AutoGeneratePage() {
     setGenerating(true);
     setError("");
     try {
-      const nextProposal = await createAutoGenerateProposal(prompt.trim());
-      setProposal(nextProposal);
-      if (!projectName.trim()) {
-        setProjectName(buildDefaultProjectName(nextProposal.normalized_prompt));
+      const { proposal_job_id } = await startAutoGenerateProposal(prompt.trim());
+      while (true) {
+        await new Promise((res) => setTimeout(res, 2000));
+        const status = await getAutoGenerateProposalJob(proposal_job_id);
+        if (status.status === "complete" && status.proposal) {
+          setProposal(status.proposal);
+          if (!projectName.trim()) {
+            setProjectName(buildDefaultProjectName(status.proposal.normalized_prompt));
+          }
+          break;
+        }
+        if (status.status === "error") {
+          throw new Error(status.error_message || "Failed to create AI proposal");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create AI proposal");
@@ -76,8 +87,18 @@ export default function AutoGeneratePage() {
     setReplacingSlots((prev) => ({ ...prev, [slotIndex]: true }));
     setError("");
     try {
-      const nextProposal = await replaceAutoGenerateProposalItem(proposal.proposal_id, slotIndex);
-      setProposal(nextProposal);
+      const { replace_job_id } = await startReplaceAutoGenerateProposalItem(proposal.proposal_id, slotIndex);
+      while (true) {
+        await new Promise((res) => setTimeout(res, 2000));
+        const status = await getAutoGenerateProposalJob(replace_job_id);
+        if (status.status === "complete" && status.proposal) {
+          setProposal(status.proposal);
+          break;
+        }
+        if (status.status === "error") {
+          throw new Error(status.error_message || "Failed to replace song");
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to replace song");
     } finally {

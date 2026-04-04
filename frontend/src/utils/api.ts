@@ -1,7 +1,9 @@
 import type {
   AutoGenerateApproval,
   AutoGenerateJobProgress,
-  AutoGenerateProposal,
+  AutoGenerateProposalJobStart,
+  AutoGenerateProposalJobStatus,
+  AutoGenerateReplaceJobStart,
   SearchResult,
   Project,
   ProjectDetail,
@@ -50,23 +52,29 @@ export async function getRecommendedTracks(
   return request(`/api/search/recommendations/${projectId}?max_results=${maxResults}`);
 }
 
-export async function createAutoGenerateProposal(
+export async function startAutoGenerateProposal(
   prompt: string
-): Promise<AutoGenerateProposal> {
+): Promise<AutoGenerateProposalJobStart> {
   return request("/api/auto-generate/proposals", {
     method: "POST",
     body: JSON.stringify({ prompt }),
   });
 }
 
-export async function replaceAutoGenerateProposalItem(
+export async function startReplaceAutoGenerateProposalItem(
   proposalId: string,
   slotIndex: number
-): Promise<AutoGenerateProposal> {
+): Promise<AutoGenerateReplaceJobStart> {
   return request(`/api/auto-generate/proposals/${proposalId}/replace`, {
     method: "POST",
     body: JSON.stringify({ slot_index: slotIndex }),
   });
+}
+
+export async function getAutoGenerateProposalJob(
+  jobId: string
+): Promise<AutoGenerateProposalJobStatus> {
+  return request(`/api/auto-generate/proposal-jobs/${jobId}`);
 }
 
 export async function approveAutoGenerateProposal(

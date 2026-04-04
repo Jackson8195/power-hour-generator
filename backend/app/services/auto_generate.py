@@ -67,6 +67,17 @@ class AutoGenerateJob:
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
+@dataclass
+class ProposalJob:
+    job_id: str
+    prompt: str
+    status: str = "pending"   # pending | complete | error
+    proposal_id: str = ""
+    error_message: str = ""
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+
 class ProposalStore:
     """In-memory ephemeral proposal storage."""
 
@@ -154,6 +165,46 @@ class AutoGenerateJobStore:
 job_store = AutoGenerateJobStore()
 
 
+class ProposalJobStore:
+    """In-memory progress tracking for pending proposal generation jobs."""
+
+    def __init__(self) -> None:
+        self._jobs: dict[str, ProposalJob] = {}
+        self._lock = asyncio.Lock()
+
+    async def save(self, job: ProposalJob) -> ProposalJob:
+        async with self._lock:
+            self._cleanup_locked()
+            self._jobs[job.job_id] = job
+            return job
+
+    async def get(self, job_id: str) -> ProposalJob | None:
+        async with self._lock:
+            self._cleanup_locked()
+            return self._jobs.get(job_id)
+
+    async def update(self, job_id: str, **changes) -> ProposalJob | None:
+        async with self._lock:
+            self._cleanup_locked()
+            job = self._jobs.get(job_id)
+            if not job:
+                return None
+            for key, value in changes.items():
+                setattr(job, key, value)
+            job.updated_at = datetime.utcnow()
+            return job
+
+    def _cleanup_locked(self) -> None:
+        now = datetime.utcnow()
+        ttl = timedelta(hours=3)
+        expired = [job_id for job_id, job in self._jobs.items() if job.updated_at + ttl <= now]
+        for expired_job_id in expired:
+            self._jobs.pop(expired_job_id, None)
+
+
+proposal_job_store = ProposalJobStore()
+
+
 def proposal_to_response(proposal: StoredProposal) -> dict:
     unresolved_count = sum(1 for item in proposal.items if item.status != "resolved")
     return {
@@ -196,6 +247,62 @@ async def create_playlist_proposal(prompt: str) -> StoredProposal:
     )
     await proposal_store.save(proposal)
     return proposal
+
+
+async def start_proposal_job(prompt: str) -> ProposalJob:
+    """Kick off create_playlist_proposal as a background task and return a job immediately."""
+    job = ProposalJob(job_id=uuid4().hex, prompt=prompt)
+    await proposal_job_store.save(job)
+
+    async def _run() -> None:
+        try:
+            proposal = await create_playlist_proposal(prompt)
+            await proposal_job_store.update(job.job_id, status="complete", proposal_id=proposal.proposal_id)
+        except Exception as exc:
+            logger.error("Proposal job %s failed: %s", job.job_id, exc)
+            await proposal_job_store.update(job.job_id, status="error", error_message="AI playlist generation failed.")
+
+    task = asyncio.create_task(_run())
+    _AUTO_PROCESS_TASKS.add(task)
+    task.add_done_callback(_AUTO_PROCESS_TASKS.discard)
+    return job
+
+
+async def start_replace_job(proposal_id: str, slot_index: int) -> ProposalJob:
+    """Kick off replace_playlist_item as a background task and return a job immediately."""
+    job = ProposalJob(job_id=uuid4().hex, prompt=f"replace:{proposal_id}:{slot_index}")
+    await proposal_job_store.save(job)
+
+    async def _run() -> None:
+        try:
+            proposal = await proposal_store.get(proposal_id)
+            if not proposal:
+                await proposal_job_store.update(job.job_id, status="error", error_message="Proposal not found or expired.")
+                return
+            item = await replace_playlist_item(proposal, slot_index)
+            updated = await proposal_store.replace_item(proposal_id, slot_index, item)
+            if not updated:
+                await proposal_job_store.update(job.job_id, status="error", error_message="Proposal not found or expired.")
+                return
+            await proposal_job_store.update(job.job_id, status="complete", proposal_id=proposal_id)
+        except Exception as exc:
+            logger.error("Replace job %s failed: %s", job.job_id, exc)
+            await proposal_job_store.update(job.job_id, status="error", error_message="AI playlist generation failed.")
+
+    task = asyncio.create_task(_run())
+    _AUTO_PROCESS_TASKS.add(task)
+    task.add_done_callback(_AUTO_PROCESS_TASKS.discard)
+    return job
+
+
+def proposal_job_to_response(job: ProposalJob, proposal: StoredProposal | None) -> dict:
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "error_message": job.error_message,
+        "proposal": proposal_to_response(proposal) if proposal else None,
+        "updated_at": job.updated_at,
+    }
 
 
 async def replace_playlist_item(proposal: StoredProposal, slot_index: int) -> AutoGenerateProposalItem:

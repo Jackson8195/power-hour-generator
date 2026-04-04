@@ -274,3 +274,19 @@ class AutoGenerateJobProgressResponse(BaseModel):
     output_path: str = ""
     error_message: str = ""
     updated_at: datetime
+
+
+class AutoGenerateProposalJobStartResponse(BaseModel):
+    proposal_job_id: str
+
+
+class AutoGenerateProposalJobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    error_message: str = ""
+    proposal: Optional[AutoGenerateProposalResponse] = None
+    updated_at: datetime
+
+
+class AutoGenerateReplaceJobStartResponse(BaseModel):
+    replace_job_id: str
