@@ -61,6 +61,9 @@ import {
   getChangoverClip,
   buildChangoverImageAudio,
   startChangoverYoutubeDownload,
+  startChangoverYoutubeAudioDownload,
+  buildChangoverYoutubeAudio,
+  setChangoverImage,
   uploadChangoverVideo,
   buildChangoverVideoTrim,
   deleteChangoverClip,
@@ -110,6 +113,12 @@ export default function ProjectPage() {
   const [changoverImageFile, setChangoverImageFile] = useState<File | null>(null);
   const [changoverAudioFile, setChangoverAudioFile] = useState<File | null>(null);
   const [changoverDuration, setChangoverDuration] = useState(3);
+  // audio source sub-toggle inside image_audio mode
+  const [audioSource, setAudioSource] = useState<"local" | "youtube">("local");
+  const [ytAudioSearchQuery, setYtAudioSearchQuery] = useState("");
+  const [ytAudioSearchResults, setYtAudioSearchResults] = useState<SearchResult[]>([]);
+  const [ytAudioSearching, setYtAudioSearching] = useState(false);
+  const [ytAudioTrimStart, setYtAudioTrimStart] = useState(0);
   // youtube mode
   const [changoverSearchQuery, setChangoverSearchQuery] = useState("");
   const [changoverSearchResults, setChangoverSearchResults] = useState<SearchResult[]>([]);
@@ -180,7 +189,13 @@ export default function ProjectPage() {
   useEffect(() => {
     if (changoverClip?.status !== "downloading") return;
     const interval = setInterval(() => {
-      getChangoverClip(projectId).then(setChangoverClip).catch(() => {});
+      getChangoverClip(projectId).then((clip) => {
+        setChangoverClip(clip);
+        // When youtube_audio finishes downloading, reset trim start
+        if (clip && clip.status === "downloaded" && clip.source_type === "youtube_audio") {
+          setYtAudioTrimStart(0);
+        }
+      }).catch(() => {});
     }, 2000);
     return () => clearInterval(interval);
   }, [changoverClip?.status, projectId]);
@@ -410,6 +425,57 @@ export default function ProjectPage() {
       setShowChangoverBuilder(false);
       setChangoverImageFile(null);
       setChangoverAudioFile(null);
+    } catch (err) {
+      setChangoverError(err instanceof Error ? err.message : "Build failed");
+    } finally {
+      setBuildingChangover(false);
+    }
+  }
+
+  async function handleYtAudioSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ytAudioSearchQuery.trim()) return;
+    setYtAudioSearching(true);
+    try {
+      const results = await searchYouTube(ytAudioSearchQuery, 8);
+      setYtAudioSearchResults(results);
+    } catch (err) {
+      setChangoverError(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setYtAudioSearching(false);
+    }
+  }
+
+  async function handlePickYtAudio(result: SearchResult) {
+    setChangoverError(null);
+    try {
+      const clip = await startChangoverYoutubeAudioDownload(projectId, {
+        youtube_id: result.youtube_id,
+        title: result.title,
+      });
+      setChangoverClip(clip);
+      setYtAudioSearchResults([]);
+      setYtAudioSearchQuery("");
+    } catch (err) {
+      setChangoverError(err instanceof Error ? err.message : "Download start failed");
+    }
+  }
+
+  async function handleBuildYoutubeAudio() {
+    setBuildingChangover(true);
+    setChangoverError(null);
+    try {
+      // If user picked an image, upload it first
+      if (changoverImageFile) {
+        await setChangoverImage(projectId, changoverImageFile);
+      }
+      const clip = await buildChangoverYoutubeAudio(projectId, {
+        audio_trim_start: ytAudioTrimStart,
+        duration: changoverDuration,
+      });
+      setChangoverClip(clip);
+      setShowChangoverBuilder(false);
+      setChangoverImageFile(null);
     } catch (err) {
       setChangoverError(err instanceof Error ? err.message : "Build failed");
     } finally {
@@ -765,60 +831,160 @@ export default function ProjectPage() {
                 {/* IMAGE + AUDIO mode */}
                 {changoverMode === "image_audio" && (
                   <div className="space-y-3">
-                    <div className="flex flex-wrap gap-3">
-                      <div>
-                        <button
-                          onClick={() => changoverImageInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 rounded-xl border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-xs tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
-                        >
-                          <Image className="h-3.5 w-3.5" />
-                          {changoverImageFile ? changoverImageFile.name : "CHOOSE IMAGE"}
-                        </button>
-                        <input
-                          ref={changoverImageInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => setChangoverImageFile(e.target.files?.[0] ?? null)}
-                        />
-                      </div>
-                      <div>
-                        <button
-                          onClick={() => changoverAudioInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 rounded-xl border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-xs tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
-                        >
-                          <Music className="h-3.5 w-3.5" />
-                          {changoverAudioFile ? changoverAudioFile.name : "CHOOSE AUDIO"}
-                        </button>
-                        <input
-                          ref={changoverAudioInputRef}
-                          type="file"
-                          accept="audio/*"
-                          className="hidden"
-                          onChange={(e) => setChangoverAudioFile(e.target.files?.[0] ?? null)}
-                        />
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/60">
-                      DURATION: {changoverDuration}s
+                    {/* Image picker (always available) */}
+                    <div>
+                      <button
+                        onClick={() => changoverImageInputRef.current?.click()}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-xs tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
+                      >
+                        <Image className="h-3.5 w-3.5" />
+                        {changoverImageFile ? changoverImageFile.name : "CHOOSE IMAGE (OPTIONAL)"}
+                      </button>
                       <input
-                        type="range"
-                        min={1}
-                        max={10}
-                        step={0.5}
-                        value={changoverDuration}
-                        onChange={(e) => setChangoverDuration(Number(e.target.value))}
-                        className="w-32"
+                        ref={changoverImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => setChangoverImageFile(e.target.files?.[0] ?? null)}
                       />
-                    </label>
-                    <button
-                      onClick={handleBuildImageAudioChangover}
-                      disabled={buildingChangover || (!changoverImageFile && !changoverAudioFile)}
-                      className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
-                      <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
-                    </button>
+                    </div>
+
+                    {/* Audio source sub-toggle */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setAudioSource("local"); setChangoverError(null); }}
+                        className={clsx(
+                          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-retro text-[11px] tracking-[0.14em] transition-all",
+                          audioSource === "local"
+                            ? "border-[#1affe4]/40 bg-[#08131a] text-[#defffb]"
+                            : "border-[#1affe4]/14 bg-transparent text-[#91fff2]/50 hover:border-[#1affe4]/28"
+                        )}
+                      >
+                        <Music className="h-3 w-3" /> UPLOAD FILE
+                      </button>
+                      <button
+                        onClick={() => { setAudioSource("youtube"); setChangoverError(null); }}
+                        className={clsx(
+                          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-retro text-[11px] tracking-[0.14em] transition-all",
+                          audioSource === "youtube"
+                            ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb]"
+                            : "border-[#1affe4]/14 bg-transparent text-[#91fff2]/50 hover:border-[#1affe4]/28"
+                        )}
+                      >
+                        <Youtube className="h-3 w-3" /> FROM YOUTUBE
+                      </button>
+                    </div>
+
+                    {/* Local audio upload */}
+                    {audioSource === "local" && (
+                      <div className="flex flex-wrap gap-3">
+                        <div>
+                          <button
+                            onClick={() => changoverAudioInputRef.current?.click()}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-xs tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
+                          >
+                            <Music className="h-3.5 w-3.5" />
+                            {changoverAudioFile ? changoverAudioFile.name : "CHOOSE AUDIO"}
+                          </button>
+                          <input
+                            ref={changoverAudioInputRef}
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={(e) => setChangoverAudioFile(e.target.files?.[0] ?? null)}
+                          />
+                        </div>
+                        <label className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/60">
+                          DURATION: {changoverDuration}s
+                          <input type="range" min={1} max={10} step={0.5} value={changoverDuration} onChange={(e) => setChangoverDuration(Number(e.target.value))} className="w-32" />
+                        </label>
+                        <button
+                          onClick={handleBuildImageAudioChangover}
+                          disabled={buildingChangover || (!changoverImageFile && !changoverAudioFile)}
+                          className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                          <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* YouTube audio rip */}
+                    {audioSource === "youtube" && (
+                      <div className="space-y-3">
+                        {/* Show search if no audio downloaded yet */}
+                        {(!changoverClip || changoverClip.source_type !== "youtube_audio" || changoverClip.status === "ready") && (
+                          <>
+                            <form onSubmit={handleYtAudioSearch} className="flex gap-2">
+                              <input
+                                type="text"
+                                className="retro-input flex-1 rounded-xl px-3 py-2 font-mono text-sm tracking-[0.12em]"
+                                placeholder="Search YouTube for audio..."
+                                value={ytAudioSearchQuery}
+                                onChange={(e) => setYtAudioSearchQuery(e.target.value)}
+                              />
+                              <button
+                                type="submit"
+                                disabled={ytAudioSearching}
+                                className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:opacity-40"
+                              >
+                                {ytAudioSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                              </button>
+                            </form>
+                            {ytAudioSearchResults.length > 0 && (
+                              <div className="space-y-2 max-h-56 overflow-y-auto">
+                                {ytAudioSearchResults.map((result) => (
+                                  <div key={result.youtube_id} className="retro-project-card flex items-center gap-3 rounded-[16px] p-3">
+                                    <img src={result.thumbnail} alt={result.title} className="h-10 w-16 shrink-0 rounded-lg object-cover" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate font-retro text-sm tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
+                                      <p className="font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/45">{result.artist}{result.duration && ` · ${result.duration}`}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => handlePickYtAudio(result)}
+                                      className="crt-action retro-button-primary shrink-0 rounded-xl px-3 py-1.5 font-retro text-xs tracking-[0.14em]"
+                                    >
+                                      <span className="crt-action__label" data-text="RIP">RIP</span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {/* Downloading */}
+                        {changoverClip?.status === "downloading" && changoverClip.source_type === "youtube_audio" && (
+                          <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/55">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Ripping audio from YouTube…
+                          </div>
+                        )}
+                        {/* Downloaded — show trim + duration + build */}
+                        {changoverClip?.status === "downloaded" && changoverClip.source_type === "youtube_audio" && (
+                          <div className="space-y-3">
+                            <p className="font-mono text-xs uppercase tracking-[0.12em] text-green-400/70">Audio ready — set start offset and duration</p>
+                            <div className="flex flex-wrap items-center gap-4">
+                              <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/60">
+                                START (s)
+                                <input type="number" min={0} step={0.5} value={ytAudioTrimStart} onChange={(e) => setYtAudioTrimStart(Number(e.target.value))} className="retro-input w-20 rounded-lg px-2 py-1 font-mono text-sm" />
+                              </label>
+                              <label className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/60">
+                                DURATION: {changoverDuration}s
+                                <input type="range" min={1} max={10} step={0.5} value={changoverDuration} onChange={(e) => setChangoverDuration(Number(e.target.value))} className="w-32" />
+                              </label>
+                            </div>
+                            <button
+                              onClick={handleBuildYoutubeAudio}
+                              disabled={buildingChangover}
+                              className="crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                              <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -342,6 +342,40 @@ export async function buildChangoverVideoTrim(
   });
 }
 
+export async function startChangoverYoutubeAudioDownload(
+  projectId: number,
+  params: { youtube_id: string; title: string }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/youtube-audio`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function buildChangoverYoutubeAudio(
+  projectId: number,
+  params: { audio_trim_start: number; duration: number }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/build`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function setChangoverImage(
+  projectId: number,
+  image: File | null
+): Promise<ChangoverClip> {
+  const form = new FormData();
+  if (image) form.append("image", image);
+  const res = await fetch(`/api/changeover/${projectId}/image`, { method: "PATCH", body: form });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function deleteChangoverClip(projectId: number): Promise<void> {
   return request(`/api/changeover/${projectId}`, { method: "DELETE" });
 }

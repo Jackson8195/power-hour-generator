@@ -23,6 +23,7 @@ async def build_changeover_clip(
     resolution: str = "1280x720",
     image_path: str | None = None,
     audio_path: str | None = None,
+    audio_trim_start: float = 0.0,
     video_path: str | None = None,
     trim_start: float = 0.0,
     trim_end: float = 0.0,
@@ -58,10 +59,11 @@ async def build_changeover_clip(
             str(output),
         ]
     elif image_path and audio_path:
+        audio_input_flags = ["-ss", str(audio_trim_start)] if audio_trim_start > 0 else []
         cmd = [
             settings.ffmpeg_path, "-y",
             "-loop", "1", "-i", image_path,
-            "-i", audio_path,
+            *audio_input_flags, "-i", audio_path,
             "-t", str(duration),
             "-vf", scale_pad,
             *codec_flags,
@@ -79,10 +81,11 @@ async def build_changeover_clip(
             str(output),
         ]
     elif audio_path:
+        audio_input_flags = ["-ss", str(audio_trim_start)] if audio_trim_start > 0 else []
         cmd = [
             settings.ffmpeg_path, "-y",
             "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30",
-            "-i", audio_path,
+            *audio_input_flags, "-i", audio_path,
             "-t", str(duration),
             *codec_flags,
             str(output),
