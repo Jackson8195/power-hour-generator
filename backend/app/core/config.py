@@ -50,6 +50,7 @@ class Settings(BaseSettings):
         self.analysis_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.render_dir.mkdir(parents=True, exist_ok=True)
+        self.changeover_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def downloads_dir(self) -> Path:
@@ -66,6 +67,10 @@ class Settings(BaseSettings):
     @property
     def temp_dir(self) -> Path:
         return self.media_dir / "temp"
+
+    @property
+    def changeover_dir(self) -> Path:
+        return self.media_dir / "changeover"
 
 
 settings = Settings()

@@ -17,6 +17,102 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+async def build_changeover_clip(
+    output_path: str,
+    duration: float,
+    resolution: str = "1280x720",
+    image_path: str | None = None,
+    audio_path: str | None = None,
+    video_path: str | None = None,
+    trim_start: float = 0.0,
+    trim_end: float = 0.0,
+) -> str:
+    """Build a short changeover (shot notification) clip.
+
+    Source priority: video_path > image_path/audio_path.
+    At least one of video_path, image_path, or audio_path must be provided.
+    """
+    w, h = map(int, resolution.split("x"))
+    scale_pad = (
+        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
+        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+    )
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    codec_flags = [
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-r", "30", "-movflags", "+faststart",
+    ]
+
+    if video_path:
+        clip_duration = (trim_end - trim_start) if trim_end > trim_start else duration
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-ss", str(trim_start),
+            "-i", video_path,
+            "-t", str(clip_duration),
+            "-vf", scale_pad,
+            *codec_flags,
+            str(output),
+        ]
+    elif image_path and audio_path:
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-loop", "1", "-i", image_path,
+            "-i", audio_path,
+            "-t", str(duration),
+            "-vf", scale_pad,
+            *codec_flags,
+            str(output),
+        ]
+    elif image_path:
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-loop", "1", "-i", image_path,
+            "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=stereo",
+            "-t", str(duration),
+            "-vf", scale_pad,
+            *codec_flags,
+            "-shortest",
+            str(output),
+        ]
+    elif audio_path:
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30",
+            "-i", audio_path,
+            "-t", str(duration),
+            *codec_flags,
+            str(output),
+        ]
+    else:
+        # Defensive fallback: black + silent
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30",
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+            "-t", str(duration),
+            *codec_flags,
+            "-shortest",
+            str(output),
+        ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error(f"FFmpeg changeover build failed: {stderr.decode()[-500:]}")
+        raise RuntimeError(f"Failed to build changeover clip: {stderr.decode()[-200:]}")
+
+    return str(output)
+
+
 async def extract_clip_segment(
     source_path: str,
     output_path: str,

@@ -77,6 +77,17 @@ docker compose up --build
 
 Then open **http://localhost:5173**.
 
+### Getting updates
+
+When a new version is available, run:
+
+```bash
+git pull
+docker compose up --build
+```
+
+The `--build` flag is required — it rebuilds the image from the updated code. Without it Docker reuses the old image and you won't get the changes.
+
 Notes:
 - Docker keeps the app local on the same machine.
 - Project data persists in `backend/data/power_hour.db`.
