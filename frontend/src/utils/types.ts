@@ -55,6 +55,7 @@ export interface RenderProgress {
   progress: number;
   output_path: string;
   error_message: string;
+  gpu_active?: boolean;
 }
 
 export interface RenderLibraryEntry {

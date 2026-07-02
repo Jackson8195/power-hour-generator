@@ -724,3 +724,61 @@
 .waveform-container wave {
   overflow: hidden !important;
 }
+
+/* Encoder status indicator near render progress.
+   Default = GPU (green phosphor light + green text); .--cpu = CPU (yellow light, gray text). */
+.gpu-active-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: "VT323", "Share Tech Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7dffb0;
+  text-shadow: 0 0 6px rgba(74, 255, 150, 0.65);
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(74, 255, 150, 0.35);
+  border-radius: 9999px;
+  background: rgba(30, 255, 150, 0.06);
+}
+.gpu-active-indicator__light {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 9999px;
+  background: #4dff91;
+  box-shadow:
+    0 0 4px rgba(77, 255, 145, 0.9),
+    0 0 10px rgba(77, 255, 145, 0.75),
+    0 0 18px rgba(77, 255, 145, 0.5);
+  animation: gpu-light-pulse 1.6s ease-in-out infinite;
+}
+/* CPU (software) encoding variant: yellow light, gray text */
+.gpu-active-indicator--cpu {
+  color: #b9b9b9;
+  text-shadow: 0 0 5px rgba(255, 208, 90, 0.3);
+  border-color: rgba(255, 200, 70, 0.32);
+  background: rgba(255, 200, 70, 0.05);
+}
+.gpu-active-indicator--cpu .gpu-active-indicator__light {
+  background: #ffd23f;
+  box-shadow:
+    0 0 4px rgba(255, 210, 63, 0.9),
+    0 0 10px rgba(255, 210, 63, 0.7),
+    0 0 18px rgba(255, 210, 63, 0.45);
+}
+/* Opacity-only pulse so the same animation works for both light colors. */
+@keyframes gpu-light-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gpu-active-indicator__light {
+    animation: none;
+  }
+}

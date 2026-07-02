@@ -24,6 +24,8 @@ router = APIRouter(prefix="/api/render", tags=["render"])
 # Active render progress and task tracking
 _render_progress: dict[int, float] = {}
 _render_tasks: dict[int, asyncio.Task] = {}
+# Whether each active render is using GPU (NVENC) encoding, set once the pipeline probes.
+_render_gpu: dict[int, bool] = {}
 
 
 def _build_output_path(project_name: str, project_id: int, render_id: int) -> Path:
@@ -125,6 +127,9 @@ async def _run_render(
             def progress_callback(pct: float):
                 _render_progress[render_id] = pct
 
+            def on_encoder_selected(gpu_active: bool):
+                _render_gpu[render_id] = gpu_active
+
             pipeline = RenderPipeline(
                 clips=clips,
                 output_path=output_path,
@@ -132,6 +137,7 @@ async def _run_render(
                 transition_type=request.transition_type,
                 include_countdown=request.include_countdown,
                 progress_callback=progress_callback,
+                on_encoder_selected=on_encoder_selected,
             )
 
             await pipeline.render()
@@ -154,6 +160,7 @@ async def _run_render(
         finally:
             _render_progress.pop(render_id, None)
             _render_tasks.pop(render_id, None)
+            _render_gpu.pop(render_id, None)
 
 
 @router.get("/{render_id}/status", response_model=RenderProgress)
@@ -171,6 +178,7 @@ async def render_status(render_id: int, db: AsyncSession = Depends(get_db)):
         progress=_render_progress.get(render_id, render.progress),
         output_path=_build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
         error_message=render.error_message if render.status == RenderStatus.ERROR else "",
+        gpu_active=_render_gpu.get(render_id, False),
     )
 
 
@@ -252,6 +260,7 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                     "status": RenderStatus.RENDERING.value,
                     "output_path": "",
                     "error_message": "",
+                    "gpu_active": _render_gpu.get(render_id, False),
                 })
             else:
                 # Check if render is complete or errored
@@ -267,6 +276,7 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                             "status": render.status.value,
                             "output_path": _build_output_url(render.output_path) if render.status == RenderStatus.COMPLETE else "",
                             "error_message": render.error_message or "" if render.status == RenderStatus.ERROR else "",
+                            "gpu_active": _render_gpu.get(render_id, False),
                         })
                         if render.status in (RenderStatus.COMPLETE, RenderStatus.ERROR):
                             break

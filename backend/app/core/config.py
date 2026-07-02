@@ -26,6 +26,11 @@ class Settings(BaseSettings):
 
     # FFmpeg
     ffmpeg_path: str = "ffmpeg"
+    # GPU encoding (opt-in). When true AND a working NVENC encoder is detected at
+    # runtime, renders use h264_nvenc; otherwise they fall back to libx264. This keeps
+    # CPU-only machines (e.g. Mac) unaffected even if the flag is accidentally set.
+    use_nvenc: bool = False
+    nvenc_preset: str = "p5"  # NVENC preset p1 (fastest) .. p7 (slowest); p5 ≈ x264 "medium"
 
     # Download settings
     max_concurrent_downloads: int = 3

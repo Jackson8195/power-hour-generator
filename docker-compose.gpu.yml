@@ -1,0 +1,28 @@
+# GPU acceleration override (NVIDIA / NVENC) — OPT-IN.
+#
+# This file is additive and is NOT loaded by a plain `docker compose up`, so it does
+# not affect Mac or other CPU-only machines. Use it only on a host with an NVIDIA GPU.
+#
+# Prereqs:
+#   - Windows + Docker Desktop (WSL2 backend): just install the NVIDIA Windows driver.
+#     Docker Desktop bundles the NVIDIA container runtime, so no separate toolkit
+#     install is needed. (Verified working with Docker Desktop 4.80.)
+#   - Native Linux host: install the NVIDIA Container Toolkit:
+#       https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#
+# Run with both files so this layers on top of the base compose:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
+#
+# Verify the container can see the GPU:
+#   docker compose exec backend nvidia-smi
+services:
+  backend:
+    environment:
+      USE_NVENC: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video]

@@ -188,6 +188,7 @@ class RenderProgress(BaseModel):
     progress: float
     output_path: str = ""
     error_message: str = ""
+    gpu_active: bool = False  # True when this render is using GPU (NVENC) encoding
 
 
 class RenderLibraryEntry(BaseModel):

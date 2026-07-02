@@ -17,6 +17,93 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _nvenc_args(crf: int) -> list[str]:
+    """ffmpeg -c:v arguments for NVIDIA GPU encoding. crf is reused as the NVENC
+    constant-quality (-cq) target so output size stays comparable to libx264."""
+    return [
+        "-c:v", "h264_nvenc",
+        "-preset", settings.nvenc_preset,
+        "-rc", "vbr", "-cq", str(crf), "-b:v", "0",
+    ]
+
+
+def _libx264_args(x264_preset: str, crf: int) -> list[str]:
+    """ffmpeg -c:v arguments for CPU (software) encoding."""
+    return ["-c:v", "libx264", "-preset", x264_preset, "-crf", str(crf)]
+
+
+async def _probe_nvenc() -> bool:
+    """Return True if h264_nvenc actually works *right now*.
+
+    Probed fresh on every call (no caching) so laptops that toggle the dGPU — e.g.
+    tools that disable it on battery — are re-evaluated per render job instead of
+    sticking to a stale result. The image may ship an ffmpeg with NVENC compiled in
+    while the GPU is powered down or not passed through, so encoder presence is not
+    enough; we do a tiny real encode and check the exit code.
+    """
+    cmd = [
+        settings.ffmpeg_path, "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+        "-c:v", "h264_nvenc", "-f", "null", "-",
+    ]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            logger.info("NVENC (h264_nvenc) available; using GPU encoding.")
+            return True
+        logger.warning(
+            "NVENC requested but unavailable now (GPU off/disabled?); using libx264. %s",
+            stderr.decode(errors="replace")[-300:],
+        )
+        return False
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning("NVENC probe error; using libx264: %s", e)
+        return False
+
+
+async def _should_use_gpu() -> bool:
+    """Whether this render job should attempt NVENC (flag on AND a live probe passes)."""
+    return settings.use_nvenc and await _probe_nvenc()
+
+
+async def _run_encode_with_fallback(
+    build_cmd: "Callable[[list[str]], list[str]]",
+    use_gpu: bool,
+    x264_preset: str,
+    crf: int,
+    label: str,
+) -> None:
+    """Run an ffmpeg encode, preferring NVENC then falling back to libx264.
+
+    `build_cmd` takes the chosen -c:v args and returns the full ffmpeg command. If the
+    GPU attempt fails (e.g. the dGPU was cut mid-render), we retry once on the CPU so a
+    render never dies just because hardware encoding became unavailable.
+    """
+    attempts: list[tuple[str, list[str]]] = []
+    if use_gpu:
+        attempts.append(("h264_nvenc", _nvenc_args(crf)))
+    attempts.append(("libx264", _libx264_args(x264_preset, crf)))
+
+    last_err = ""
+    for name, enc_args in attempts:
+        cmd = build_cmd(enc_args)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            return
+        last_err = stderr.decode(errors="replace")[-500:]
+        if name == "h264_nvenc":
+            logger.warning(
+                "%s: NVENC encode failed, retrying on CPU (libx264). %s", label, last_err
+            )
+    raise RuntimeError(f"{label}: ffmpeg encode failed. {last_err}")
+
+
 async def extract_clip_segment(
     source_path: str,
     output_path: str,
@@ -28,32 +115,24 @@ async def extract_clip_segment(
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        settings.ffmpeg_path,
-        "-y",
-        "-ss", str(start_time),
-        "-i", source_path,
-        "-t", str(duration),
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-movflags", "+faststart",
-        str(output),
-    ]
+    def build_cmd(encoder_args: list[str]) -> list[str]:
+        return [
+            settings.ffmpeg_path,
+            "-y",
+            "-ss", str(start_time),
+            "-i", source_path,
+            "-t", str(duration),
+            *encoder_args,
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            str(output),
+        ]
 
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    await _run_encode_with_fallback(
+        build_cmd, await _should_use_gpu(), "veryfast", 23,
+        label=f"extract clip from {source_path}",
     )
-    _, stderr = await proc.communicate()
-
-    if proc.returncode != 0:
-        logger.error(f"FFmpeg clip extraction failed: {stderr.decode()[-500:]}")
-        raise RuntimeError(f"Failed to extract clip from {source_path}")
-
     return str(output)
 
 
@@ -70,6 +149,7 @@ class RenderPipeline:
         countdown_start: int = 55,
         include_countdown: bool = True,
         progress_callback: Optional[Callable[[float], None]] = None,
+        on_encoder_selected: Optional[Callable[[bool], None]] = None,
     ):
         self.clips = clips  # List of {file_path, start_time, end_time, title}
         self.output_path = Path(output_path)
@@ -79,10 +159,20 @@ class RenderPipeline:
         self.countdown_start = countdown_start
         self.include_countdown = include_countdown
         self.progress_callback = progress_callback
+        # Called once with True/False after the encoder is chosen for this job, so the
+        # caller can surface whether GPU (NVENC) encoding is active.
+        self.on_encoder_selected = on_encoder_selected
 
     async def render(self) -> str:
         """Execute the full render pipeline."""
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Decide the encoder once per render job. Re-probing here (rather than caching
+        # for the process lifetime) means a GPU that was toggled on/off between renders
+        # is picked up without restarting the backend.
+        self._use_gpu = await _should_use_gpu()
+        if self.on_encoder_selected:
+            self.on_encoder_selected(self._use_gpu)
 
         total_steps = len(self.clips) + 1  # normalize each clip + final concat
         current_step = 0
@@ -139,52 +229,44 @@ class RenderPipeline:
         tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir=str(settings.temp_dir))
         tmp.close()
 
-        cmd = [
-            settings.ffmpeg_path,
-            "-y",
-            "-ss", str(start_time),
-            "-i", file_path,
-            "-t", str(duration),
-            # Video: scale to target resolution, pad if aspect ratio differs
-            "-vf", (
-                f"scale={self.width}:{self.height}:force_original_aspect_ratio=decrease,"
-                f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2:black,"
-                "setsar=1"
-            ),
-            # Audio: normalize loudness (two-pass when possible to avoid A/V sync drift)
-            "-af", af_filter,
-            # Codec settings
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-ar", "44100",
-            "-ac", "2",
-            # Ensure consistent framerate
-            "-r", "30",
-            "-movflags", "+faststart",
-            tmp.name,
-        ]
-
-        # Add countdown overlay if enabled
+        # Video filter: scale to target resolution, pad if aspect ratio differs, then
+        # append the countdown overlay when enabled.
+        vf = (
+            f"scale={self.width}:{self.height}:force_original_aspect_ratio=decrease,"
+            f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2:black,"
+            "setsar=1"
+        )
         if self.include_countdown:
             countdown_filter = self._build_countdown_filter(duration)
             if countdown_filter:
-                vf_idx = cmd.index("-vf") + 1
-                cmd[vf_idx] = cmd[vf_idx] + "," + countdown_filter
+                vf = vf + "," + countdown_filter
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        def build_cmd(encoder_args: list[str]) -> list[str]:
+            return [
+                settings.ffmpeg_path,
+                "-y",
+                "-ss", str(start_time),
+                "-i", file_path,
+                "-t", str(duration),
+                "-vf", vf,
+                # Audio: normalize loudness (two-pass when possible to avoid A/V sync drift)
+                "-af", af_filter,
+                # Video codec chosen by the caller (NVENC or libx264)
+                *encoder_args,
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ar", "44100",
+                "-ac", "2",
+                # Ensure consistent framerate
+                "-r", "30",
+                "-movflags", "+faststart",
+                tmp.name,
+            ]
+
+        await _run_encode_with_fallback(
+            build_cmd, getattr(self, "_use_gpu", False), "medium", 23,
+            label=f"normalize clip {file_path}",
         )
-        _, stderr = await proc.communicate()
-
-        if proc.returncode != 0:
-            logger.error(f"FFmpeg normalize failed: {stderr.decode()[-500:]}")
-            raise RuntimeError(f"Failed to normalize clip: {file_path}")
-
         return tmp.name
 
     async def _measure_loudnorm(self, file_path: str, start_time: float, duration: float) -> "dict | None":

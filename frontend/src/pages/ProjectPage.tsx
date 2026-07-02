@@ -412,13 +412,33 @@ export default function ProjectPage() {
             <div className="retro-panel mb-6 rounded-[22px] p-5">
               <div className="relative z-10">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="font-retro text-sm tracking-[0.18em] text-[#91fff2]">
-                    {renderProgress.status === "rendering"
-                      ? "RENDERING..."
-                      : renderProgress.status === "complete"
-                        ? "RENDER COMPLETE"
-                        : `STATUS: ${renderProgress.status.toUpperCase()}`}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="font-retro text-sm tracking-[0.18em] text-[#91fff2]">
+                      {renderProgress.status === "rendering"
+                        ? "RENDERING..."
+                        : renderProgress.status === "complete"
+                          ? "RENDER COMPLETE"
+                          : `STATUS: ${renderProgress.status.toUpperCase()}`}
+                    </p>
+                    {renderProgress.status === "rendering" && (
+                      <span
+                        className={clsx(
+                          "gpu-active-indicator",
+                          !renderProgress.gpu_active && "gpu-active-indicator--cpu"
+                        )}
+                        title={
+                          renderProgress.gpu_active
+                            ? "Encoding on the GPU (NVENC)"
+                            : "Encoding on the CPU (libx264)"
+                        }
+                      >
+                        <span className="gpu-active-indicator__light" />
+                        {renderProgress.gpu_active
+                          ? "GPU ENCODING ACTIVE"
+                          : "CPU ENCODING ACTIVE"}
+                      </span>
+                    )}
+                  </div>
                   <span className="font-mono text-sm text-[#ffb6dd]/75">
                     {Math.round(renderProgress.progress)}%
                   </span>
