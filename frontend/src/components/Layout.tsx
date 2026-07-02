@@ -7,7 +7,7 @@ export default function Layout() {
     <div className="flex min-h-screen flex-col bg-[#060b10] text-zinc-100">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[#1affe4]/10 bg-[#050a0f]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+        <div className="mx-auto flex h-16 max-w-[1800px] items-center justify-between px-4">
           <BackButton fallback="/" />
 
           <Link to="/" className="crt-action flex items-center gap-3 text-zinc-100">
@@ -24,7 +24,7 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="mx-auto max-w-[1800px] px-4 py-6">
           <Outlet />
         </div>
       </main>

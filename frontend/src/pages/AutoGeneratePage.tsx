@@ -131,7 +131,7 @@ export default function AutoGeneratePage() {
       <div className="pointer-events-none fixed inset-0 animate-crt-flicker bg-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,43,157,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_30%)]" />
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-8 sm:px-6">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1800px] flex-col px-4 py-8 sm:px-6">
         <div className="retro-shell rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
           <div className="relative z-10">
             <div className="flex flex-col gap-4 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -307,8 +307,8 @@ export default function AutoGeneratePage() {
                             key={`${proposal.proposal_id}-${item.slot_index}`}
                             className="retro-project-card rounded-[20px] p-4"
                           >
-                            <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start">
-                              <div className="flex min-w-0 items-start gap-4">
+                            <div className="relative z-10 flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
+                              <div className="flex min-w-0 items-center gap-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#1affe4]/12 bg-[#08131a] font-retro text-xs tracking-[0.18em] text-[#91fff2]/70">
                                   {item.slot_index + 1}
                                 </div>
@@ -324,13 +324,13 @@ export default function AutoGeneratePage() {
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 flex-1 overflow-hidden">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">
+                              <div className="min-w-0 overflow-hidden">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                  <p className="min-w-0 max-w-full truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">
                                     {item.title || item.requested_title}
                                   </p>
                                   {item.resolution_source ? (
-                                    <span className="rounded-full border border-[#1affe4]/14 bg-[#08141b] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#91fff2]/70">
+                                    <span className="shrink-0 rounded-full border border-[#1affe4]/14 bg-[#08141b] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#91fff2]/70">
                                       {formatSearchSourceLabel(item.resolution_source)}
                                     </span>
                                   ) : null}
@@ -352,7 +352,7 @@ export default function AutoGeneratePage() {
                               <button
                                 onClick={() => handleReplace(item.slot_index)}
                                 disabled={replacingSlots[item.slot_index] || generating || approving}
-                                className="crt-action retro-button-secondary inline-flex shrink-0 self-start items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40 lg:self-center"
+                                className="crt-action retro-button-secondary inline-flex shrink-0 self-start items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40 lg:self-auto lg:justify-self-end"
                               >
                                 {replacingSlots[item.slot_index] ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

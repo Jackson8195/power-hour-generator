@@ -368,7 +368,7 @@ export default function ProjectPage() {
     <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden rounded-[28px] bg-[#070b10] px-4 py-6 scanlines sm:px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,43,157,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_26%)]" />
 
-      <section className="retro-shell relative mx-auto max-w-7xl rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
+      <section className="retro-shell relative mx-auto max-w-[1800px] rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10">
           <div className="mb-6 flex flex-col gap-5 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div>

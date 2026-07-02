@@ -54,7 +54,7 @@ export default function AutoGenerateProgressPage() {
       <div className="pointer-events-none fixed inset-0 animate-crt-flicker bg-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,43,157,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_30%)]" />
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-8 sm:px-6">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1800px] flex-col px-4 py-8 sm:px-6">
         <div className="retro-shell flex flex-1 flex-col rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex flex-col gap-4 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
