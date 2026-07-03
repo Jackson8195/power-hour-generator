@@ -221,6 +221,47 @@ class ClipCommitRequest(BaseModel):
     end_time: float = Field(..., gt=0)
 
 
+# ─── Changeover Clip ─────────────────────────────────────
+
+class ChangoverClipDB(Base):
+    __tablename__ = "changover_clips"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    project_id    = Column(Integer, ForeignKey("projects.id"), nullable=False, unique=True)
+    source_type   = Column(String(20), default="image_audio")  # image_audio | youtube | local_video
+    youtube_id    = Column(String(50), default="")
+    image_path    = Column(String(500), default="")
+    audio_path    = Column(String(500), default="")
+    raw_video_path = Column(String(500), default="")   # pre-trim downloaded/uploaded video
+    output_path   = Column(String(500), default="")    # pre-built .mp4
+    duration      = Column(Float, default=3.0)
+    trim_start    = Column(Float, default=0.0)
+    trim_end      = Column(Float, default=0.0)
+    status        = Column(String(50), default="pending")  # pending | downloading | downloaded | ready | error
+    error_message = Column(Text, default="")
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ChangoverClipResponse(BaseModel):
+    id: int
+    project_id: int
+    source_type: str
+    youtube_id: str
+    image_path: str
+    audio_path: str
+    raw_video_path: str
+    output_path: str
+    duration: float
+    trim_start: float
+    trim_end: float
+    status: str
+    error_message: str
+    preview_url: str = ""
+    raw_video_url: str = ""
+    model_config = {"from_attributes": True}
+
+
 class AutoGenerateProposalCreate(BaseModel):
     prompt: str = Field(..., min_length=3, max_length=1000)
 

@@ -51,8 +51,9 @@ async def search_youtube(
             results = await _search_with_ytdlp(query, fetch_limit)
         except Exception as exc:
             logger.warning(
-                "YouTube Data API search failed for query %r (%s); falling back to yt-dlp search.",
+                "YouTube Data API search failed for query %r (%s: %s); falling back to yt-dlp search.",
                 query,
+                type(exc).__name__,
                 exc,
             )
             results = await _search_with_ytdlp(query, fetch_limit)
@@ -105,7 +106,7 @@ async def recommend_for_project(clips: list[ClipDB], max_results: int = 12) -> l
 
 async def _search_with_api(query: str, max_results: int) -> list[SearchResult]:
     """Search using YouTube Data API v3."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         search_resp = await client.get(YOUTUBE_SEARCH_URL, params={
             "part": "snippet",
             "q": _build_search_query(query),
@@ -305,6 +306,52 @@ async def download_video(
         "title": html.unescape(data.get("title", "")),
         "artist": html.unescape(data.get("channel", data.get("uploader", ""))),
     }
+
+
+async def download_audio_only(
+    youtube_id: str,
+    output_dir: Optional[Path] = None,
+) -> str:
+    """Download audio-only from a YouTube video using yt-dlp. Returns the file path."""
+    output_dir = output_dir or settings.downloads_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_template = str(output_dir / f"{youtube_id}_audio.%(ext)s")
+    url = f"https://www.youtube.com/watch?v={youtube_id}"
+
+    cmd = [
+        "yt-dlp",
+        url,
+        "-f", "bestaudio",
+        "--extract-audio",
+        "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "-o", output_template,
+        "--no-playlist",
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"yt-dlp audio download failed: {stderr.decode()[-300:]}")
+
+    # yt-dlp may output as .mp3 directly or convert
+    mp3_path = output_dir / f"{youtube_id}_audio.mp3"
+    if mp3_path.exists():
+        return str(mp3_path)
+
+    # Fallback: find any matching file
+    candidates = sorted(output_dir.glob(f"{youtube_id}_audio.*"))
+    for c in candidates:
+        if c.is_file():
+            return str(c)
+
+    raise RuntimeError(f"Audio file not found after download for {youtube_id}")
 
 
 def _resolve_downloaded_file(output_dir: Path, youtube_id: str) -> str:

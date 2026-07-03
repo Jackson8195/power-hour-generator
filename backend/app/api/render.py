@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import get_db, async_session
 from app.core.security import public_render_url
 from app.models.schemas import (
-    ProjectDB, ClipDB, RenderDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
+    ProjectDB, ClipDB, RenderDB, ChangoverClipDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
 )
 from app.services.ffmpeg import RenderPipeline
 
@@ -98,6 +98,28 @@ async def start_render(
         }
         for clip in ready_clips
     ]
+
+    # Interleave changeover clip if one exists for this project
+    changover_result = await db.execute(
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id,
+            ChangoverClipDB.status == "ready",
+        )
+    )
+    changover = changover_result.scalar_one_or_none()
+
+    if changover and changover.output_path and Path(changover.output_path).exists():
+        interleaved = []
+        for i, clip in enumerate(clip_data):
+            interleaved.append(clip)
+            if i < len(clip_data) - 1:
+                interleaved.append({
+                    "file_path": changover.output_path,
+                    "start_time": 0.0,
+                    "end_time": changover.duration,
+                    "title": "SHOT!",
+                })
+        clip_data = interleaved
 
     # Start render in background
     task = asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request))

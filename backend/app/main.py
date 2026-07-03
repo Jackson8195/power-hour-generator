@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.storage import migrate_storage_layout
-from app.api import search, downloads, clips, projects, render, cast, auto_generate
+from app.api import search, downloads, clips, projects, render, cast, auto_generate, changeover
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ app.include_router(projects.router)
 app.include_router(render.router)
 app.include_router(cast.router)
 app.include_router(auto_generate.router)
+app.include_router(changeover.router)
 
 
 @app.get("/api/health")

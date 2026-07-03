@@ -12,6 +12,7 @@ import type {
   RenderProgress,
   RenderLibraryEntry,
   CastDevice,
+  ChangoverClip,
 } from "./types";
 
 const BASE = "";
@@ -277,4 +278,104 @@ export async function healthCheck(): Promise<{
   version: string;
 }> {
   return request("/api/health");
+}
+
+// ─── Changeover Clip ─────────────────────────────────────
+
+export async function getChangoverClip(projectId: number): Promise<ChangoverClip | null> {
+  try {
+    return await request<ChangoverClip>(`/api/changeover/${projectId}`);
+  } catch (err) {
+    // 404 means no clip configured yet — not an error
+    if (err instanceof Error && err.message.includes("404")) return null;
+    throw err;
+  }
+}
+
+export async function buildChangoverImageAudio(
+  projectId: number,
+  params: { image?: File; audio?: File; duration: number }
+): Promise<ChangoverClip> {
+  const form = new FormData();
+  if (params.image) form.append("image", params.image);
+  if (params.audio) form.append("audio", params.audio);
+  form.append("duration", String(params.duration));
+  const res = await fetch(`/api/changeover/${projectId}`, { method: "POST", body: form });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function startChangoverYoutubeDownload(
+  projectId: number,
+  params: { youtube_id: string; title: string }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/youtube`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function uploadChangoverVideo(
+  projectId: number,
+  video: File
+): Promise<ChangoverClip> {
+  const form = new FormData();
+  form.append("video", video);
+  const res = await fetch(`/api/changeover/${projectId}/upload-video`, { method: "POST", body: form });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function buildChangoverVideoTrim(
+  projectId: number,
+  params: { trim_start: number; trim_end: number }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/build`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function startChangoverYoutubeAudioDownload(
+  projectId: number,
+  params: { youtube_id: string; title: string }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/youtube-audio`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function buildChangoverYoutubeAudio(
+  projectId: number,
+  params: { audio_trim_start: number; duration: number }
+): Promise<ChangoverClip> {
+  return request(`/api/changeover/${projectId}/build`, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function setChangoverImage(
+  projectId: number,
+  image: File | null
+): Promise<ChangoverClip> {
+  const form = new FormData();
+  if (image) form.append("image", image);
+  const res = await fetch(`/api/changeover/${projectId}/image`, { method: "PATCH", body: form });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteChangoverClip(projectId: number): Promise<void> {
+  return request(`/api/changeover/${projectId}`, { method: "DELETE" });
 }

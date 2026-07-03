@@ -149,3 +149,26 @@ export interface AutoGenerateProposalJobStatus {
   proposal: AutoGenerateProposal | null;
   updated_at: string;
 }
+
+// ─── Changeover Clip ─────────────────────────────────────
+
+export type ChangoverClipStatus = "pending" | "downloading" | "downloaded" | "ready" | "error";
+export type ChangoverSourceType = "image_audio" | "youtube" | "youtube_audio" | "local_video";
+
+export interface ChangoverClip {
+  id: number;
+  project_id: number;
+  source_type: ChangoverSourceType;
+  youtube_id: string;
+  image_path: string;
+  audio_path: string;
+  raw_video_path: string;
+  output_path: string;
+  duration: number;
+  trim_start: number;
+  trim_end: number;
+  status: ChangoverClipStatus;
+  error_message: string;
+  preview_url: string;
+  raw_video_url: string;
+}
