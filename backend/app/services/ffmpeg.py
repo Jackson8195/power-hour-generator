@@ -335,7 +335,9 @@ class RenderPipeline:
             f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2:black,"
             "setsar=1"
         )
-        if self.include_countdown:
+        # Changeover ("SHOT!") clips are interstitials between songs — they must not
+        # get the per-song countdown/DRINK overlay.
+        if self.include_countdown and not clip.get("is_changeover"):
             countdown_filter = self._build_countdown_filter(duration)
             if countdown_filter:
                 vf = vf + "," + countdown_filter

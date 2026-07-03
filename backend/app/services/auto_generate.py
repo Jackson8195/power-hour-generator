@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.security import public_render_url, resolve_managed_path, unlink_managed_file
 from app.models.schemas import AutoGenerateProposalItem, SearchResult
 from app.services.audio_analysis import analyze_audio
+from app.services.changeover import apply_changeover_interleave
 from app.services.ffmpeg import extract_clip_segment
 from app.services.youtube import download_video, search_youtube
 
@@ -843,6 +844,10 @@ async def _run_auto_render(job_id: str, project_id: int) -> None:
             }
             for clip in ready_clips
         ]
+
+        # Interleave the project's changeover clip between songs, if one is ready.
+        # No-op for a freshly generated project until the user configures one.
+        clip_data = await apply_changeover_interleave(db, project_id, clip_data)
 
         await job_store.update(
             job_id,
