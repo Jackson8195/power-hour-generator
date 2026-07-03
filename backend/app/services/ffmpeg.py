@@ -203,6 +203,61 @@ async def build_changeover_clip(
     return str(output)
 
 
+async def build_default_shot_card(
+    output_path: str,
+    duration: float = 4.0,
+    resolution: str = "1280x720",
+) -> str:
+    """Build the default transition card: a black screen with a 3·2·1 countdown
+    followed by a bold "SHOT!" flash.
+
+    Used as the automatic transition between songs when the user did not configure
+    a custom changeover clip.
+    """
+    w, h = map(int, resolution.split("x"))
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    # Countdown 3, 2, 1 over the first three seconds, then "SHOT!" for the remainder.
+    draws = []
+    for idx, num in enumerate((3, 2, 1)):
+        draws.append(
+            f"drawtext=text='{num}':fontsize=240:fontcolor=white:borderw=6:bordercolor=black:"
+            f"x=(w-text_w)/2:y=(h-text_h)/2:enable='between(t,{idx},{idx + 1})'"
+        )
+    draws.append(
+        f"drawtext=text='SHOT!':fontsize=200:fontcolor=yellow:borderw=6:bordercolor=black:"
+        f"x=(w-text_w)/2:y=(h-text_h)/2:enable='gte(t,3)'"
+    )
+    vf = ",".join(draws)
+
+    cmd = [
+        settings.ffmpeg_path, "-y",
+        "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30",
+        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+        "-t", str(duration),
+        "-vf", vf,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-r", "30", "-movflags", "+faststart",
+        "-shortest",
+        str(output),
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error(f"FFmpeg default shot card build failed: {stderr.decode()[-500:]}")
+        raise RuntimeError(f"Failed to build default shot card: {stderr.decode()[-200:]}")
+
+    return str(output)
+
+
 async def extract_clip_segment(
     source_path: str,
     output_path: str,

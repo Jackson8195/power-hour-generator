@@ -118,6 +118,11 @@ export interface AutoGenerateApproval {
   clip_ids: number[];
 }
 
+export interface AutoGenerateProject {
+  project_id: number;
+  clip_ids: number[];
+}
+
 export interface AutoGenerateJobProgress {
   job_id: string;
   project_id: number;

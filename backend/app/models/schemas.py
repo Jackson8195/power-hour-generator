@@ -272,6 +272,18 @@ class AutoGenerateProposalReplaceRequest(BaseModel):
 
 class AutoGenerateProposalApproveRequest(BaseModel):
     project_name: str = Field(default="", max_length=255)
+    # When the user configured a custom transition, the frontend pre-creates the
+    # project (via the /project endpoint) and passes its id here so approve reuses it
+    # instead of creating a fresh one.
+    project_id: Optional[int] = None
+    # Insert a transition between songs. If no custom changeover was configured, a
+    # default 3·2·1 → "SHOT!" card is built at approve time.
+    include_transition: bool = True
+
+
+class AutoGenerateProjectResponse(BaseModel):
+    project_id: int
+    clip_ids: list[int]
 
 
 class AutoGenerateProposalItem(BaseModel):

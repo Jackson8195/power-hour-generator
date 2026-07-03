@@ -8,12 +8,15 @@ import {
   CheckCircle2,
   PanelLeftClose,
   PanelLeftOpen,
+  Film,
 } from "lucide-react";
 import CrtStaticText from "../components/CrtStaticText";
 import BackButton from "../components/BackButton";
+import ChangeoverBuilder from "../components/ChangeoverBuilder";
 import type { AutoGenerateProposal } from "../utils/types";
 import {
   approveAutoGenerateProposal,
+  createProjectForProposal,
   getAutoGenerateProposalJob,
   startAutoGenerateProposal,
   startReplaceAutoGenerateProposalItem,
@@ -36,6 +39,12 @@ export default function AutoGeneratePage() {
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
   const [replacingSlots, setReplacingSlots] = useState<Record<number, boolean>>({});
+  // Transition (changeover) config, chosen before approval.
+  // OFF (default): backend builds a default 3·2·1 → "SHOT!" card.
+  // ON: pre-create the project so the full builder can attach a custom clip.
+  const [includeCustomTransition, setIncludeCustomTransition] = useState(false);
+  const [transitionProjectId, setTransitionProjectId] = useState<number | null>(null);
+  const [preparingTransition, setPreparingTransition] = useState(false);
 
   const resolvedCount = useMemo(
     () => proposal?.items.filter((item) => item.status === "resolved").length ?? 0,
@@ -66,6 +75,9 @@ export default function AutoGeneratePage() {
         const status = await getAutoGenerateProposalJob(proposal_job_id);
         if (status.status === "complete" && status.proposal) {
           setProposal(status.proposal);
+          // A new proposal invalidates any pre-created transition project.
+          setTransitionProjectId(null);
+          setIncludeCustomTransition(false);
           if (!projectName.trim()) {
             setProjectName(buildDefaultProjectName(status.proposal.normalized_prompt));
           }
@@ -93,6 +105,10 @@ export default function AutoGeneratePage() {
         const status = await getAutoGenerateProposalJob(replace_job_id);
         if (status.status === "complete" && status.proposal) {
           setProposal(status.proposal);
+          // Replacing a song changes the clip list; a pre-created transition
+          // project would be stale, so reset it.
+          setTransitionProjectId(null);
+          setIncludeCustomTransition(false);
           break;
         }
         if (status.status === "error") {
@@ -106,15 +122,41 @@ export default function AutoGeneratePage() {
     }
   }
 
+  async function handleToggleCustomTransition() {
+    const next = !includeCustomTransition;
+    setIncludeCustomTransition(next);
+    // Turning it on the first time pre-creates the project so the builder has a
+    // real project id to attach the changeover clip to.
+    if (next && transitionProjectId === null && proposal) {
+      setPreparingTransition(true);
+      setError("");
+      try {
+        const { project_id } = await createProjectForProposal(
+          proposal.proposal_id,
+          projectName.trim() || buildDefaultProjectName(proposal.normalized_prompt)
+        );
+        setTransitionProjectId(project_id);
+      } catch (err) {
+        setIncludeCustomTransition(false);
+        setError(err instanceof Error ? err.message : "Failed to prepare transition builder");
+      } finally {
+        setPreparingTransition(false);
+      }
+    }
+  }
+
   async function handleApprove() {
     if (!proposal) return;
     setApproving(true);
     setError("");
     try {
-      const result = await approveAutoGenerateProposal(
-        proposal.proposal_id,
-        projectName.trim() || buildDefaultProjectName(proposal.normalized_prompt)
-      );
+      const result = await approveAutoGenerateProposal(proposal.proposal_id, {
+        projectName: projectName.trim() || buildDefaultProjectName(proposal.normalized_prompt),
+        // Reuse the pre-created project when a custom transition was configured
+        // (avoids orphaning it); backend falls back to the default SHOT card.
+        projectId: transitionProjectId,
+        includeTransition: true,
+      });
       const nextJob = { jobId: result.job_id, projectId: result.project_id };
       window.localStorage.setItem("power-hour-active-ai-job", JSON.stringify(nextJob));
       setActiveJob(nextJob);
@@ -299,6 +341,62 @@ export default function AutoGeneratePage() {
                             APPROVE & CREATE PROJECT
                           </span>
                         </button>
+                      </div>
+
+                      {/* Transition between clips */}
+                      <div className="mt-5">
+                        <div className="rounded-[20px] border border-[#1affe4]/14 bg-[#08131a]/60 p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                              <Film className="mt-0.5 h-4 w-4 shrink-0 text-[#ff77c2]" />
+                              <div>
+                                <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">
+                                  TRANSITION BETWEEN CLIPS
+                                </p>
+                                <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                                  {includeCustomTransition
+                                    ? "Custom clip — build it below."
+                                    : "Default: a 3·2·1 countdown into a SHOT! card."}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleToggleCustomTransition}
+                              disabled={preparingTransition}
+                              role="switch"
+                              aria-checked={includeCustomTransition}
+                              className={[
+                                "inline-flex h-8 w-44 shrink-0 items-center justify-between rounded-full border px-3 font-retro text-[11px] tracking-[0.16em] transition-all disabled:opacity-50",
+                                includeCustomTransition
+                                  ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb]"
+                                  : "border-[#1affe4]/20 bg-[#08131a] text-[#91fff2]/60",
+                              ].join(" ")}
+                            >
+                              {preparingTransition ? (
+                                <span className="mx-auto inline-flex items-center gap-2">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> PREPARING…
+                                </span>
+                              ) : (
+                                <>
+                                  <span>{includeCustomTransition ? "CUSTOM CLIP" : "DEFAULT SHOT"}</span>
+                                  <span
+                                    className={[
+                                      "inline-block h-4 w-4 rounded-full transition-all",
+                                      includeCustomTransition ? "bg-[#ff77c2]" : "bg-[#1affe4]/40",
+                                    ].join(" ")}
+                                  />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {includeCustomTransition && transitionProjectId !== null && (
+                          <div className="mt-4">
+                            <ChangeoverBuilder projectId={transitionProjectId} />
+                          </div>
+                        )}
                       </div>
 
                       <div className="mt-5 flex-1 space-y-3 overflow-y-auto pr-1">

@@ -1,5 +1,6 @@
 import type {
   AutoGenerateApproval,
+  AutoGenerateProject,
   AutoGenerateJobProgress,
   AutoGenerateProposalJobStart,
   AutoGenerateProposalJobStatus,
@@ -80,9 +81,23 @@ export async function getAutoGenerateProposalJob(
 
 export async function approveAutoGenerateProposal(
   proposalId: string,
-  projectName?: string
+  opts: { projectName?: string; projectId?: number | null; includeTransition?: boolean } = {}
 ): Promise<AutoGenerateApproval> {
   return request(`/api/auto-generate/proposals/${proposalId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({
+      project_name: opts.projectName ?? "",
+      project_id: opts.projectId ?? null,
+      include_transition: opts.includeTransition ?? true,
+    }),
+  });
+}
+
+export async function createProjectForProposal(
+  proposalId: string,
+  projectName?: string
+): Promise<AutoGenerateProject> {
+  return request(`/api/auto-generate/proposals/${proposalId}/project`, {
     method: "POST",
     body: JSON.stringify({ project_name: projectName ?? "" }),
   });
