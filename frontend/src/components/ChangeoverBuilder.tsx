@@ -109,7 +109,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
     if (!ytAudioSearchQuery.trim()) return;
     setYtAudioSearching(true);
     try {
-      const results = await searchYouTube(ytAudioSearchQuery, 8);
+      const results = await searchYouTube(ytAudioSearchQuery, 8, undefined, false);
       setYtAudioSearchResults(results);
     } catch (err) {
       setChangoverError(err instanceof Error ? err.message : "Search failed");
@@ -160,7 +160,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
     if (!changoverSearchQuery.trim()) return;
     setChangoverSearching(true);
     try {
-      const results = await searchYouTube(changoverSearchQuery, 8);
+      const results = await searchYouTube(changoverSearchQuery, 8, undefined, false);
       setChangoverSearchResults(results);
     } catch (err) {
       setChangoverError(err instanceof Error ? err.message : "Search failed");

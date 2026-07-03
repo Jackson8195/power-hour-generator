@@ -36,19 +36,25 @@ async def search_youtube(
     query: str,
     max_results: int = 10,
     preferred_artists: Optional[list[str]] = None,
+    music: bool = True,
 ) -> list[SearchResult]:
-    """Search YouTube using the Data API v3 or yt-dlp fallback, then rerank."""
+    """Search YouTube using the Data API v3 or yt-dlp fallback, then rerank.
+
+    When ``music`` is False the search is a plain YouTube search — no music-category
+    filter, no "official music video" query suffix, and no music-specific ranking.
+    Used for changeover/transition clips, which usually aren't songs.
+    """
     fetch_limit = min(max(max_results * 3, 15), 30)
     if settings.youtube_api_key:
         try:
-            results = await _search_with_api(query, fetch_limit)
+            results = await _search_with_api(query, fetch_limit, music=music)
         except httpx.HTTPStatusError as exc:
             logger.warning(
                 "YouTube Data API search failed with %s for query %r; falling back to yt-dlp search.",
                 exc.response.status_code,
                 query,
             )
-            results = await _search_with_ytdlp(query, fetch_limit)
+            results = await _search_with_ytdlp(query, fetch_limit, music=music)
         except Exception as exc:
             logger.warning(
                 "YouTube Data API search failed for query %r (%s: %s); falling back to yt-dlp search.",
@@ -56,11 +62,11 @@ async def search_youtube(
                 type(exc).__name__,
                 exc,
             )
-            results = await _search_with_ytdlp(query, fetch_limit)
+            results = await _search_with_ytdlp(query, fetch_limit, music=music)
     else:
         results = await _search_with_ytdlp(query, fetch_limit)
 
-    ranked = _rank_search_results(query, results, preferred_artists=preferred_artists or [])
+    ranked = _rank_search_results(query, results, preferred_artists=preferred_artists or [], music=music)
     return ranked[:max_results]
 
 
@@ -104,17 +110,19 @@ async def recommend_for_project(clips: list[ClipDB], max_results: int = 12) -> l
     return recommendations[:max_results]
 
 
-async def _search_with_api(query: str, max_results: int) -> list[SearchResult]:
+async def _search_with_api(query: str, max_results: int, music: bool = True) -> list[SearchResult]:
     """Search using YouTube Data API v3."""
+    params = {
+        "part": "snippet",
+        "q": _build_search_query(query, music),
+        "type": "video",
+        "maxResults": max_results,
+        "key": settings.youtube_api_key,
+    }
+    if music:
+        params["videoCategoryId"] = "10"  # restrict to YouTube's Music category
     async with httpx.AsyncClient(timeout=15.0) as client:
-        search_resp = await client.get(YOUTUBE_SEARCH_URL, params={
-            "part": "snippet",
-            "q": _build_search_query(query),
-            "type": "video",
-            "videoCategoryId": "10",
-            "maxResults": max_results,
-            "key": settings.youtube_api_key,
-        })
+        search_resp = await client.get(YOUTUBE_SEARCH_URL, params=params)
         search_resp.raise_for_status()
         search_data = search_resp.json()
 
@@ -151,11 +159,11 @@ async def _search_with_api(query: str, max_results: int) -> list[SearchResult]:
         ]
 
 
-async def _search_with_ytdlp(query: str, max_results: int) -> list[SearchResult]:
+async def _search_with_ytdlp(query: str, max_results: int, music: bool = True) -> list[SearchResult]:
     """Fallback search using yt-dlp."""
     cmd = [
         "yt-dlp",
-        f"ytsearch{max_results}:{_build_search_query(query)}",
+        f"ytsearch{max_results}:{_build_search_query(query, music)}",
         "--dump-json",
         "--flat-playlist",
         "--no-download",
@@ -189,9 +197,14 @@ async def _search_with_ytdlp(query: str, max_results: int) -> list[SearchResult]
     return results
 
 
-def _build_search_query(query: str) -> str:
-    """Nudge YouTube toward official music videos without making search too rigid."""
+def _build_search_query(query: str, music: bool = True) -> str:
+    """Nudge YouTube toward official music videos without making search too rigid.
+
+    For non-music (transition) searches the query is used verbatim.
+    """
     cleaned = query.strip()
+    if not music:
+        return cleaned
     lowered = cleaned.lower()
     if any(term in lowered for term in ("official", "lyrics", "live", "cover", "karaoke", "instrumental")):
         return cleaned
@@ -202,8 +215,10 @@ def _rank_search_results(
     query: str,
     results: list[SearchResult],
     preferred_artists: list[str],
+    music: bool = True,
 ) -> list[SearchResult]:
-    """Apply music-specific ranking heuristics to raw YouTube results."""
+    """Rank raw YouTube results. Music-specific heuristics apply only when ``music``
+    is True; otherwise results are ranked by plain term relevance + view count."""
     parsed_artist, parsed_song = _split_query(query)
     query_terms = _meaningful_terms(query)
     preferred_terms = {_normalize_text(artist) for artist in preferred_artists if artist}
@@ -221,29 +236,30 @@ def _rank_search_results(
             elif term in combined:
                 score += 1.1
 
-        if parsed_artist:
-            artist_terms = _meaningful_terms(parsed_artist)
-            song_terms = _meaningful_terms(parsed_song) if parsed_song else []
-            if all(term in combined for term in artist_terms):
-                score += 8
-            if song_terms and all(term in title_norm for term in song_terms):
-                score += 7
-            if artist_terms and song_terms and all(term in combined for term in artist_terms + song_terms):
-                score += 6
+        if music:
+            if parsed_artist:
+                artist_terms = _meaningful_terms(parsed_artist)
+                song_terms = _meaningful_terms(parsed_song) if parsed_song else []
+                if all(term in combined for term in artist_terms):
+                    score += 8
+                if song_terms and all(term in title_norm for term in song_terms):
+                    score += 7
+                if artist_terms and song_terms and all(term in combined for term in artist_terms + song_terms):
+                    score += 6
 
-        for positive in POSITIVE_TITLE_HINTS:
-            if positive in title_norm:
-                score += 2
+            for positive in POSITIVE_TITLE_HINTS:
+                if positive in title_norm:
+                    score += 2
 
-        for negative in NEGATIVE_TITLE_HINTS:
-            if negative in title_norm and negative not in _normalize_text(query):
-                score -= 4
+            for negative in NEGATIVE_TITLE_HINTS:
+                if negative in title_norm and negative not in _normalize_text(query):
+                    score -= 4
 
-        if preferred_terms and any(pref in artist_norm for pref in preferred_terms):
-            score += 5
+            if preferred_terms and any(pref in artist_norm for pref in preferred_terms):
+                score += 5
 
-        if "vevo" in artist_norm or "official" in artist_norm:
-            score += 1.5
+            if "vevo" in artist_norm or "official" in artist_norm:
+                score += 1.5
 
         score += min(_parse_view_count(result.view_count) / 50_000_000, 3)
         result.match_score = round(score, 2)

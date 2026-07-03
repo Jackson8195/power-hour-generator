@@ -100,6 +100,9 @@ class SearchQuery(BaseModel):
     query: str = Field(..., min_length=1, max_length=200)
     max_results: int = Field(default=10, ge=1, le=50)
     project_id: Optional[int] = None
+    # False = plain YouTube search (no music-category filter / suffix / ranking),
+    # used for transition (changeover) clip searches.
+    music: bool = True
 
 
 class SearchResult(BaseModel):

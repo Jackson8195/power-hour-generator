@@ -32,6 +32,7 @@ async def search(query: SearchQuery, db: AsyncSession = Depends(get_db)):
             query.query,
             query.max_results,
             preferred_artists=preferred_artists,
+            music=query.music,
         )
         return results
     except Exception as e:

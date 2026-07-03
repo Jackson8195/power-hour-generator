@@ -35,7 +35,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export async function searchYouTube(
   query: string,
   maxResults = 10,
-  projectId?: number
+  projectId?: number,
+  music = true
 ): Promise<SearchResult[]> {
   return request("/api/search/youtube", {
     method: "POST",
@@ -43,6 +44,7 @@ export async function searchYouTube(
       query,
       max_results: maxResults,
       project_id: projectId,
+      music,
     }),
   });
 }
