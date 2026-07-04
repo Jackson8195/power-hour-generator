@@ -106,7 +106,7 @@ export default function MixtapeBinderPage() {
 
         <button
           onClick={() => navigate("/works-in-progress")}
-          className="crt-action retro-button-secondary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
+          className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
         >
           <FolderOpen className="h-4 w-4" />
           <span className="crt-action__label" data-text="OPEN WIP LIBRARY">
@@ -123,7 +123,7 @@ export default function MixtapeBinderPage() {
             textClassName="animate-pulse text-center font-retro text-2xl tracking-[0.2em] text-[#91fff2]/70"
           />
         ) : renders.length === 0 ? (
-          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center rounded-[30px] border border-[#1affe4]/10 bg-[#08131a]/80 px-6 py-12 text-center">
+          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center border border-[#1affe4]/10 bg-[#08131a]/80 px-6 py-12 text-center">
             <Film className="h-14 w-14 text-[#ff77c2]/55" />
             <CrtStaticText
               as="p"
@@ -133,7 +133,7 @@ export default function MixtapeBinderPage() {
             />
             <button
               onClick={() => navigate("/works-in-progress")}
-              className="crt-action retro-button-primary mt-8 inline-flex items-center gap-3 rounded-xl px-5 py-3 font-retro text-sm tracking-[0.16em]"
+              className="crt-action retro-button-primary mt-8 inline-flex items-center gap-3 px-5 py-3 font-retro text-base tracking-[0.16em]"
             >
               <span className="crt-action__label" data-text="GO TO WORKS IN PROGRESS">
                 GO TO WORKS IN PROGRESS
@@ -142,10 +142,10 @@ export default function MixtapeBinderPage() {
           </div>
         ) : (
           <>
-            <section className="retro-shell mx-auto w-full max-w-6xl rounded-[30px] p-5 sm:p-6">
+            <section className="retro-shell mx-auto w-full max-w-6xl p-5 sm:p-6">
               <div className="relative z-10">
                 <div className="mx-auto max-w-3xl text-center">
-                  <p className="font-retro text-xs tracking-[0.34em] text-[#1affe4]/62">
+                  <p className="font-retro text-sm tracking-[0.34em] text-[#1affe4]/70">
                     FINISHED MIXTAPE LIBRARY
                   </p>
                   <CrtStaticText
@@ -199,15 +199,13 @@ export default function MixtapeBinderPage() {
                   </div>
                 </div>
 
-                <div className="mt-8 rounded-[24px] border border-[#ff77c2]/10 bg-[#120810]/90 p-5">
+                <div className="retro-panel retro-panel--labeled mt-8 p-5 pt-7">
+                  <span className="retro-panel__label retro-panel__label--pink">SELECTED OUTPUT</span>
                   <div className="mx-auto max-w-3xl text-center">
-                    <p className="font-retro text-sm tracking-[0.24em] text-[#1affe4]/70">
-                      SELECTED OUTPUT
-                    </p>
-                    <p className="mt-4 font-retro text-2xl tracking-[0.14em] text-[#ffb6dd]">
+                    <p className="font-retro text-2xl tracking-[0.14em] text-[#ffb6dd]">
                       {selectedRender?.project_name ?? "NONE"}
                     </p>
-                    <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                    <p className="mt-3 font-mono text-sm text-[#91fff2]/60">
                       {selectedRender?.completed_at
                         ? `Rendered ${new Date(selectedRender.completed_at).toLocaleString()}`
                         : ""}
@@ -217,7 +215,7 @@ export default function MixtapeBinderPage() {
                         <button
                           onClick={() => startPlayback(selectedRender.render_id)}
                           disabled={animatingRenderId !== null}
-                          className="crt-action retro-button-primary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="crt-action retro-button-primary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <PlayCircle className="h-4 w-4" />
                           <span className="crt-action__label" data-text="PLAY MIXTAPE">
@@ -226,7 +224,7 @@ export default function MixtapeBinderPage() {
                         </button>
                         <button
                           onClick={() => handleDeleteRender(selectedRender.render_id)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-3 font-retro text-xs tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
+                          className="inline-flex items-center gap-2 border border-red-500/30 bg-red-500/10 px-3 py-3 font-retro text-base tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
                           title="Delete this render"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -283,13 +281,13 @@ export default function MixtapeBinderPage() {
           onClick={closeViewer}
         >
           <div
-            className="relative w-full max-w-6xl rounded-[28px] border border-[#1affe4]/10 bg-[#030608] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:p-6"
+            className="relative w-full max-w-6xl border border-[#1affe4]/10 bg-[#030608] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="relative">
               <div className="flex items-start justify-between gap-4 border-b border-[#1affe4]/10 pb-4">
                 <div>
-                  <p className="font-retro text-xs tracking-[0.32em] text-[#1affe4]/60">
+                  <p className="font-retro text-sm tracking-[0.32em] text-[#1affe4]/70">
                     NOW PLAYING
                   </p>
                   <CrtStaticText
@@ -301,7 +299,7 @@ export default function MixtapeBinderPage() {
                 </div>
                 <button
                   onClick={closeViewer}
-                  className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+                  className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em]"
                 >
                   <X className="h-4 w-4" />
                   <span className="crt-action__label" data-text="CLOSE">
@@ -310,7 +308,7 @@ export default function MixtapeBinderPage() {
                 </button>
               </div>
 
-              <div className="mt-5 overflow-hidden rounded-[24px] border border-[#1affe4]/10 bg-black">
+              <div className="mt-5 overflow-hidden rounded-bezel border border-[#1affe4]/10 bg-black">
                 {viewerStage === "loading" ? (
                   <div className="mixtape-walkman flex min-h-[72vh] items-center justify-center p-6">
                     <div className="mixtape-walkman__body mixtape-walkman__body--modal">
@@ -323,13 +321,13 @@ export default function MixtapeBinderPage() {
                       <div className="mixtape-walkman__speaker mixtape-walkman__speaker--right" />
 
                       <div className="mixtape-walkman__screen">
-                        <p className="font-retro text-xs tracking-[0.28em] text-[#91fff2]/75">
+                        <p className="font-retro text-sm tracking-[0.28em] text-[#91fff2]/80">
                           INSERTING DISC
                         </p>
                         <p className="mt-3 font-retro text-lg tracking-[0.12em] text-[#ffb6dd]">
                           {viewerRender.project_name}
                         </p>
-                        <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[#91fff2]/45">
+                        <p className="mt-3 font-mono text-sm text-[#91fff2]/60">
                           The disc is dropping into the deck and slowly spinning up before playback.
                         </p>
                       </div>
@@ -489,7 +487,7 @@ function DiscSlot({
       </div>
 
       <div className="text-center">
-        <p className="font-retro text-[0.65rem] tracking-[0.24em] text-[#91fff2]/65">
+        <p className="font-retro text-sm tracking-[0.24em] text-[#91fff2]/70">
           RENDER #{render.render_id}
         </p>
       </div>

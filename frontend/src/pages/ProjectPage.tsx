@@ -353,7 +353,7 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
+      <div className="retro-panel px-6 py-16 text-center">
         <CrtStaticText
           as="p"
           text="LOADING PROJECT..."
@@ -366,14 +366,14 @@ export default function ProjectPage() {
   const reviewedClips = project.clips.filter((c) => c.has_selection);
 
   return (
-    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden rounded-[28px] bg-[#070b10] px-4 py-6 scanlines sm:px-6">
+    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden bg-[#070b10] px-4 py-6 scanlines sm:px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,43,157,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_26%)]" />
 
-      <section className="retro-shell relative mx-auto max-w-[1800px] rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
+      <section className="retro-shell relative mx-auto max-w-[1800px] px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10">
           <div className="mb-6 flex flex-col gap-5 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="font-retro text-xs tracking-[0.45em] text-[#1affe4]/60">
+              <p className="font-retro text-sm tracking-[0.45em] text-[#1affe4]/70">
                 EDIT MIXTAPE
               </p>
               <CrtStaticText
@@ -382,14 +382,14 @@ export default function ProjectPage() {
                 className="mt-2"
                 textClassName="font-retro text-3xl tracking-[0.22em] text-[#ff77c2] glow-text sm:text-5xl"
               />
-              <p className="mt-3 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
+              <p className="mt-3 font-mono text-base text-[#91fff2]/70">
                 {reviewedClips.length} of {project.clips.length} clips have a locked-in range.
               </p>
             </div>
             <button
               onClick={handleStartRender}
               disabled={reviewedClips.length === 0 || renderProgress?.status === "rendering"}
-              className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 rounded-xl px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+              className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {renderProgress?.status === "rendering" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -403,18 +403,19 @@ export default function ProjectPage() {
           </div>
 
           {renderError && (
-            <div className="retro-panel mb-6 rounded-[22px] p-5">
-              <p className="font-retro text-sm tracking-[0.18em] text-red-400">RENDER FAILED</p>
-              <p className="mt-2 font-mono text-xs tracking-[0.14em] text-[#ffb6dd]/80">{renderError}</p>
+            <div className="retro-panel retro-panel--labeled mb-6 p-5 pt-6">
+              <span className="retro-panel__label" style={{ color: "#ff8080" }}>RENDER FAILED</span>
+              <p className="font-mono text-sm tracking-[0.14em] text-[#ffb6dd]/90">{renderError}</p>
             </div>
           )}
 
           {renderProgress && (
-            <div className="retro-panel mb-6 rounded-[22px] p-5">
+            <div className="retro-panel retro-panel--labeled mb-6 p-5 pt-6">
+              <span className="retro-panel__label">RENDER STATUS</span>
               <div className="relative z-10">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <p className="font-retro text-sm tracking-[0.18em] text-[#91fff2]">
+                    <p className="font-retro text-base tracking-[0.18em] text-[#91fff2]">
                       {renderProgress.status === "rendering"
                         ? "RENDERING..."
                         : renderProgress.status === "complete"
@@ -440,14 +441,14 @@ export default function ProjectPage() {
                       </span>
                     )}
                   </div>
-                  <span className="font-mono text-sm text-[#ffb6dd]/75">
+                  <span className="font-retro text-2xl text-[#ffb6dd]/90">
                     {Math.round(renderProgress.progress)}%
                   </span>
                 </div>
-                <div className="retro-progress h-2 overflow-hidden rounded-full">
+                <div className="retro-progress h-3">
                   <div
                     className={clsx(
-                      "h-full rounded-full transition-all",
+                      "h-full transition-all",
                       renderProgress.status === "complete"
                         ? "bg-green-500"
                         : renderProgress.status === "error"
@@ -459,12 +460,12 @@ export default function ProjectPage() {
                 </div>
                 {renderProgress.status === "rendering" && (
                   <div className="mt-4 flex items-center justify-between gap-4">
-                    <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+                    <p className="font-mono text-sm text-[#91fff2]/70">
                       Estimated time 12 minutes. So this should take about 5 or 10 minutes.
                     </p>
                     <button
                       onClick={handleCancelRender}
-                      className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 font-retro text-xs tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
+                      className="shrink-0 inline-flex items-center gap-2 border border-red-500/30 bg-red-500/10 px-3 py-1.5 font-retro text-sm tracking-[0.16em] text-red-400 hover:bg-red-500/20 transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                       CANCEL
@@ -476,7 +477,7 @@ export default function ProjectPage() {
                     <a
                       href={renderProgress.output_path}
                       target="_blank"
-                      className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-sm tracking-[0.16em]"
+                      className="crt-action retro-button-secondary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em]"
                       rel="noreferrer"
                     >
                       <Play className="h-3.5 w-3.5" />
@@ -484,7 +485,7 @@ export default function ProjectPage() {
                         WATCH
                       </span>
                     </a>
-                    <button className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2 font-retro text-sm tracking-[0.16em]">
+                    <button className="crt-action retro-button-secondary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em]">
                       <Tv className="h-3.5 w-3.5" />
                       <span className="crt-action__label" data-text="CAST TO TV">
                         CAST TO TV
@@ -503,7 +504,7 @@ export default function ProjectPage() {
             <button
               onClick={() => setActiveTab("search")}
               className={clsx(
-                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
+                "crt-action border px-4 py-2.5 font-retro text-base tracking-[0.16em] transition-all",
                 activeTab === "search"
                   ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
                   : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
@@ -519,7 +520,7 @@ export default function ProjectPage() {
             <button
               onClick={() => setActiveTab("timeline")}
               className={clsx(
-                "crt-action rounded-xl border px-4 py-2.5 font-retro text-sm tracking-[0.16em] transition-all",
+                "crt-action border px-4 py-2.5 font-retro text-base tracking-[0.16em] transition-all",
                 activeTab === "timeline"
                   ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb] shadow-[0_0_18px_rgba(255,43,157,0.16)]"
                   : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28 hover:text-[#defffb]"
@@ -539,7 +540,7 @@ export default function ProjectPage() {
           <form onSubmit={handleSearch} className="mb-4 flex gap-2">
             <input
               type="text"
-              className="retro-input w-full rounded-xl px-4 py-3 font-mono text-sm tracking-[0.12em]"
+              className="retro-input w-full px-4 py-3 font-mono text-sm tracking-[0.12em]"
               placeholder="Search for music videos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -547,7 +548,7 @@ export default function ProjectPage() {
             <button
               type="submit"
               disabled={searching}
-              className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+              className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-4 py-3 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {searching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -561,7 +562,8 @@ export default function ProjectPage() {
           </form>
 
           {searchResults.length > 0 && (
-            <div className="mb-6 space-y-2">
+            <div className="tracklist retro-panel--labeled mb-6 pt-2">
+              <span className="retro-panel__label">SEARCH RESULTS</span>
               {searchResults.map((result) => (
                 <SearchResultCard
                   key={result.youtube_id}
@@ -577,20 +579,20 @@ export default function ProjectPage() {
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">RECOMMENDED NEXT PICKS</p>
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                <p className="font-retro text-base tracking-[0.18em] text-zinc-200">RECOMMENDED NEXT PICKS</p>
+                <p className="font-mono text-sm text-[#91fff2]/60">
                   Suggestions update from the artists already showing up in this project.
                 </p>
               </div>
               {loadingRecommendations && (
-                <div className="font-retro text-xs tracking-[0.16em] text-[#91fff2]/60">
+                <div className="font-retro text-sm tracking-[0.16em] text-[#91fff2]/70">
                   <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> Refreshing
                 </div>
               )}
             </div>
 
             {recommendedResults.length > 0 ? (
-              <div className="space-y-2">
+              <div className="tracklist">
                 {recommendedResults.map((result) => (
                   <SearchResultCard
                     key={`rec-${result.youtube_id}`}
@@ -603,7 +605,7 @@ export default function ProjectPage() {
                 ))}
               </div>
             ) : (
-              <div className="retro-panel rounded-[18px] px-4 py-4 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/45">
+              <div className="retro-panel px-4 py-4 font-mono text-sm text-[#91fff2]/60">
                 Add a few songs and this section will start surfacing more picks from the same artists.
               </div>
             )}
@@ -614,40 +616,42 @@ export default function ProjectPage() {
           {activeTab === "timeline" && (
             <div className="space-y-3">
               {project.clips.length === 0 ? (
-                <div className="retro-panel rounded-[22px] px-6 py-16 text-center">
+                <div className="retro-panel px-6 py-16 text-center">
                   <CrtStaticText
                     as="p"
                     text="NO CLIPS YET"
                     textClassName="font-retro text-3xl tracking-[0.2em] text-[#ff77c2]/85"
                   />
-                  <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/45">
+                  <p className="mt-4 font-mono text-sm text-[#91fff2]/60">
                     Search and add songs to begin the review flow.
                   </p>
                 </div>
               ) : (
                 <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={project.clips.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-                    {project.clips.map((clip, index) => (
-                      <ClipReviewCard
-                        key={clip.id}
-                        clip={clip}
-                        index={index}
-                        expanded={expandedClipId === clip.id}
-                        analysis={analysisByClip[clip.id]}
-                        draft={draftRanges[clip.id]}
-                        loadingAnalysis={loadingAnalysis[clip.id] ?? false}
-                        saving={savingClipIds[clip.id] ?? false}
-                        committing={committingClipIds[clip.id] ?? false}
-                        onExpand={() => handleExpandClip(clip)}
-                        onDelete={() => handleDeleteClip(clip.id)}
-                        onUseSuggestion={() => handleUseSuggestion(clip)}
-                        onSaveDraft={() => handleSaveDraft(clip)}
-                        onCommit={() => handleCommitSelection(clip)}
-                        onDraftChange={(range) =>
-                          setDraftRanges((prev) => ({ ...prev, [clip.id]: range }))
-                        }
-                      />
-                    ))}
+                    <div className="tracklist">
+                      {project.clips.map((clip, index) => (
+                        <ClipReviewCard
+                          key={clip.id}
+                          clip={clip}
+                          index={index}
+                          expanded={expandedClipId === clip.id}
+                          analysis={analysisByClip[clip.id]}
+                          draft={draftRanges[clip.id]}
+                          loadingAnalysis={loadingAnalysis[clip.id] ?? false}
+                          saving={savingClipIds[clip.id] ?? false}
+                          committing={committingClipIds[clip.id] ?? false}
+                          onExpand={() => handleExpandClip(clip)}
+                          onDelete={() => handleDeleteClip(clip.id)}
+                          onUseSuggestion={() => handleUseSuggestion(clip)}
+                          onSaveDraft={() => handleSaveDraft(clip)}
+                          onCommit={() => handleCommitSelection(clip)}
+                          onDraftChange={(range) =>
+                            setDraftRanges((prev) => ({ ...prev, [clip.id]: range }))
+                          }
+                        />
+                      ))}
+                    </div>
                   </SortableContext>
                 </DndContext>
               )}
@@ -676,36 +680,28 @@ function SearchResultCard({
   const sourceLabel = formatSearchSourceLabel(result.search_source);
 
   return (
-    <div className="retro-project-card flex items-center gap-4 rounded-[20px] p-4">
+    <div className="tracklist-row">
       <img
         src={result.thumbnail}
         alt={result.title}
-        className="h-16 w-28 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
+        className="h-16 w-28 shrink-0 object-cover ring-1 ring-[#1affe4]/10"
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
-          {badgeLabel ? (
-            <span className="rounded-full border border-[#1affe4]/14 bg-[#08141b] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#91fff2]/70">
-              {badgeLabel}
-            </span>
-          ) : null}
-          {sourceLabel ? (
-            <span className="rounded-full border border-[#ff77c2]/18 bg-[#140913] px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-[#ffb6dd]/80">
-              {sourceLabel}
-            </span>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate font-retro text-lg tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
+          {badgeLabel ? <span className="retro-chip retro-chip--info">{badgeLabel}</span> : null}
+          {sourceLabel ? <span className="retro-chip retro-chip--pink">{sourceLabel}</span> : null}
         </div>
-        <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/55">
+        <p className="font-mono text-sm text-[#91fff2]/70">
           {result.artist}
           {result.duration && ` · ${result.duration}`}
         </p>
-        {subcopy ? <p className="mt-1 font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/35">{subcopy}</p> : null}
+        {subcopy ? <p className="mt-1 font-mono text-sm text-[#91fff2]/60">{subcopy}</p> : null}
       </div>
       <button
         onClick={onAdd}
         disabled={alreadyAdded}
-        className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+        className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Download className="h-3.5 w-3.5" />
         <span className="crt-action__label" data-text={alreadyAdded ? "ADDED" : "ADD"}>
@@ -775,67 +771,67 @@ function ClipReviewCard({
       ref={setNodeRef}
       style={dragStyle}
       className={clsx(
-        "retro-project-card overflow-hidden rounded-[22px] p-4",
-        committedClip && "border-l-2 border-l-green-500",
+        "tracklist-row flex-col !items-stretch gap-0 p-0",
+        committedClip && "tracklist-row--locked",
         isDragging && "opacity-50"
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 p-4">
         <button
           {...attributes}
           {...listeners}
-          className="shrink-0 cursor-grab touch-none text-[#91fff2]/25 hover:text-[#91fff2]/60 active:cursor-grabbing"
+          className="shrink-0 cursor-grab touch-none text-[#91fff2]/25 hover:text-[#91fff2]/70 active:cursor-grabbing"
           tabIndex={-1}
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="h-5 w-5" />
         </button>
-        <div className="flex w-6 shrink-0 items-center justify-center">
-          <span className="font-retro text-xs tracking-[0.2em] text-[#91fff2]/45">{index + 1}</span>
-        </div>
+        <span className="tracklist-row__num">{String(index + 1).padStart(2, "0")}</span>
 
         {clip.source_thumbnail ? (
           <img
             src={clip.source_thumbnail}
             alt={clip.source_title}
-            className="h-14 w-24 shrink-0 rounded-lg object-cover ring-1 ring-[#1affe4]/10"
+            className="h-14 w-24 shrink-0 object-cover ring-1 ring-[#1affe4]/10"
           />
         ) : (
-          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-[#08131a]">
+          <div className="flex h-14 w-24 shrink-0 items-center justify-center bg-[#08131a]">
             <Play className="h-4 w-4 text-zinc-600" />
           </div>
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{clip.source_title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate font-retro text-lg tracking-[0.12em] text-[#ffb6dd]">{clip.source_title}</p>
             {committedClip && (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-green-400">
+              <span className="retro-chip retro-chip--ok">
                 <CheckCircle2 className="h-3 w-3" />
                 Clipped
               </span>
             )}
             {clip.file_missing && (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 font-retro text-[10px] uppercase tracking-[0.18em] text-red-400">
-                ⚠ File Missing
-              </span>
+              <span className="retro-chip retro-chip--error">⚠ File Missing</span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/70">
             <span>{clip.source_artist}</span>
             {clip.bpm && <span>· {Math.round(clip.bpm)} BPM</span>}
             <span>· {statusCopy}</span>
-            {clip.has_selection && (
-              <span>
-                · {formatTime(clip.start_time)} to {formatTime(clip.end_time)}
-              </span>
-            )}
           </div>
         </div>
+
+        {clip.has_selection && (
+          <>
+            <span className="tracklist-row__leader hidden sm:block" />
+            <span className="tracklist-row__time">
+              {formatTime(clip.start_time)}–{formatTime(clip.end_time)}
+            </span>
+          </>
+        )}
 
         {clip.status === "ready" && !committedClip && (
           <button
             onClick={onExpand}
-            className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+            className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em]"
           >
             <ChevronDown className={clsx("h-4 w-4 transition-transform", expanded && "rotate-180")} />
             <span
@@ -849,43 +845,43 @@ function ClipReviewCard({
 
         <button
           onClick={onDelete}
-          className="rounded-lg p-1.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-300"
+          className="rounded-bezel p-1.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-300"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
 
       {clip.status !== "ready" && (
-        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+        <p className="px-4 pb-4 font-mono text-sm text-[#91fff2]/60">
           {clip.status === "error" ? clip.source_title + " failed to process." : statusCopy}
-        </div>
+        </p>
       )}
 
       {clip.status === "ready" && committedClip && (
-        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+        <p className="px-4 pb-4 font-mono text-sm text-[#91fff2]/60">
           This clip is already trimmed. Replace or delete it to change the song selection.
-        </div>
+        </p>
       )}
 
       {clip.status === "ready" && !expanded && !clip.has_selection && (
-        <div className="mt-3 rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 px-3 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+        <p className="px-4 pb-4 font-mono text-sm text-[#91fff2]/60">
           Analysis is ready. Click Open Review to see the waveform and choose a range.
-        </div>
+        </p>
       )}
 
       {expanded && clip.status === "ready" && (
-        <div className="mt-4">
+        <div className="retro-tray">
           {loadingAnalysis ? (
-            <div className="retro-panel flex h-56 items-center justify-center rounded-[22px] text-[#91fff2]/55">
+            <div className="flex h-56 items-center justify-center text-[#91fff2]/60">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Loading analysis...
             </div>
           ) : (
-            <div className="retro-panel rounded-[22px] p-4">
+            <div>
               <div className="mb-4 flex flex-col gap-3 border-b border-[#1affe4]/10 pb-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">TRIM ON THE WAVEFORM</p>
-                  <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                  <p className="font-retro text-base tracking-[0.18em] text-zinc-200">TRIM ON THE WAVEFORM</p>
+                  <p className="mt-1 font-mono text-sm text-[#91fff2]/70">
                     Drag the left or right edge of the selection window to choose the exact clip length.
                   </p>
                 </div>
@@ -893,7 +889,7 @@ function ClipReviewCard({
                   <button
                     onClick={onUseSuggestion}
                     disabled={saving}
-                    className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em]"
+                    className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em]"
                   >
                     {saving ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -915,10 +911,10 @@ function ClipReviewCard({
                       src={clip.preview_url}
                       controls
                       preload="metadata"
-                      className="w-full rounded-[22px] border border-[#1affe4]/12 bg-black"
+                      className="w-full rounded-bezel border border-[#1affe4]/12 bg-black"
                     />
                   )}
-                  <div className="rounded-xl border border-[#1affe4]/10 bg-[#08131a]/90 p-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                  <div className="border border-[#1affe4]/10 bg-[#08131a]/90 p-3 font-mono text-sm text-[#91fff2]/70">
                     <div className="flex items-center justify-between">
                       <span>Chosen range</span>
                       <span className="font-mono text-zinc-200">
@@ -953,7 +949,7 @@ function ClipReviewCard({
                             onDraftChange({ start: highlight.start, end: highlight.end });
                             seekVideo(highlight.start);
                           }}
-                          className="rounded-full border border-[#1affe4]/14 bg-[#08131a] px-3 py-1 font-retro text-xs tracking-[0.14em] text-[#91fff2]/70 transition-colors hover:border-[#ff2b9d]/30 hover:text-[#ffd7eb]"
+                          className="retro-chip retro-chip--info transition-colors hover:border-[#ff2b9d]/40 hover:text-[#ffd7eb]"
                         >
                           {highlight.label}: {formatTime(highlight.start)} to {formatTime(highlight.end)}
                         </button>
@@ -965,7 +961,7 @@ function ClipReviewCard({
                     <button
                       onClick={onSaveDraft}
                       disabled={!hasValidSelection || saving}
-                      className="crt-action retro-button-secondary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                       <span className="crt-action__label" data-text="SAVE RANGE">
@@ -976,8 +972,8 @@ function ClipReviewCard({
                       onClick={onCommit}
                       disabled={!hasValidSelection || committing || saving || committedClip}
                       className={committedClip
-                        ? "inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] border border-green-500/20 bg-green-500/5 text-green-400/50 cursor-not-allowed"
-                        : "crt-action retro-button-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 font-retro text-xs tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                        ? "inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em] border border-green-500/20 bg-green-500/5 text-green-400/50 cursor-not-allowed"
+                        : "crt-action retro-button-primary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                       }
                     >
                       {committing ? (
@@ -991,7 +987,7 @@ function ClipReviewCard({
                     </button>
                   </div>
 
-                  <p className="font-mono text-xs uppercase tracking-[0.12em] text-[#91fff2]/40">
+                  <p className="font-mono text-sm text-[#91fff2]/60">
                     Saving keeps your chosen timestamps. Trimming creates the final clip file and frees the original download.
                   </p>
                 </div>
@@ -1064,93 +1060,94 @@ function WaveformRangeEditor({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={clsx(
-        "relative overflow-hidden rounded-[20px] border border-[#1affe4]/12 bg-gradient-to-b from-[#08131b] to-[#050c12] px-3 py-5",
-        onSeek && "cursor-pointer"
-      )}
-      onClick={handleWaveformClick}
-      title={onSeek ? "Click to seek video" : undefined}
-    >
+    <div className="border border-[#1affe4]/12 bg-gradient-to-b from-[#08131b] to-[#050c12] px-3 py-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">WAVEFORM RANGE</p>
-          <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+          <p className="font-retro text-base tracking-[0.18em] text-zinc-200">WAVEFORM RANGE</p>
+          <p className="font-mono text-sm text-[#91fff2]/70">
             Drag either edge of the pink window to trim.
           </p>
         </div>
-        <div className="rounded-full border border-[#ff77c2]/18 bg-[#150913] px-3 py-1 font-retro text-xs tracking-[0.18em] text-[#ffb6dd]">
+        <div className="retro-chip retro-chip--pink text-base">
           {formatTime(Math.max(selection.end - selection.start, 0))}
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-0">
-        {selection.end > selection.start && (
-          <div
-            className="absolute inset-y-[54px] rounded-lg border border-[#ff77c2]/75 bg-[#ff2b9d]/12"
-            style={{
-              left: `${duration ? (selection.start / duration) * 100 : 0}%`,
-              width: `${duration ? ((selection.end - selection.start) / duration) * 100 : 0}%`,
-            }}
-          />
-        )}
+      {/* Bar-strip wrapper: containerRef and every overlay share this exact box so
+          percentage-based positions line up pixel-for-pixel with the rendered bars. */}
+      <div
+        ref={containerRef}
+        className={clsx("relative h-28", onSeek && "cursor-pointer")}
+        onClick={handleWaveformClick}
+        title={onSeek ? "Click to seek video" : undefined}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          {selection.end > selection.start && (
+            <div
+              className="absolute inset-y-0 border border-[#ff77c2]/75 bg-[#ff2b9d]/12"
+              style={{
+                left: `${duration ? (selection.start / duration) * 100 : 0}%`,
+                width: `${duration ? ((selection.end - selection.start) / duration) * 100 : 0}%`,
+              }}
+            />
+          )}
+        </div>
+
+        <div className="absolute inset-0">
+          {highlights.map((highlight) => (
+            <div
+              key={`${highlight.start}-${highlight.end}`}
+              className="absolute inset-y-0 bg-[#1affe4]/10 transition-colors hover:bg-[#1affe4]/20"
+              style={{
+                left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
+                width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
+              }}
+              title={`${highlight.label} — click to play from ${formatTime(highlight.start)}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSeek?.(highlight.start);
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="pointer-events-none absolute inset-0 flex items-end gap-[2px]">
+          {(waveform.length ? waveform : new Array(80).fill(0.15)).map((bar, index) => (
+            <div
+              key={`${index}-${bar}`}
+              className="flex-1 bg-[#91fff2]/75"
+              style={{ height: `${Math.max(bar * 100, 8)}%` }}
+            />
+          ))}
+        </div>
+
+        {duration > 0 && selection.end > selection.start ? (
+          <>
+            <button
+              type="button"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                dragStateRef.current = "start";
+              }}
+              className="absolute inset-y-0 z-10 w-4 -translate-x-1/2 cursor-ew-resize border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
+              style={{ left: `${(selection.start / duration) * 100}%` }}
+              aria-label="Drag selection start"
+            />
+            <button
+              type="button"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                dragStateRef.current = "end";
+              }}
+              className="absolute inset-y-0 z-10 w-4 -translate-x-1/2 cursor-ew-resize border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
+              style={{ left: `${(selection.end / duration) * 100}%` }}
+              aria-label="Drag selection end"
+            />
+          </>
+        ) : null}
       </div>
 
-      <div className="absolute inset-0">
-        {highlights.map((highlight) => (
-          <div
-            key={`${highlight.start}-${highlight.end}`}
-            className="absolute inset-y-[54px] rounded-lg bg-[#1affe4]/10 transition-colors hover:bg-[#1affe4]/20"
-            style={{
-              left: `${duration ? (highlight.start / duration) * 100 : 0}%`,
-              width: `${duration ? ((highlight.end - highlight.start) / duration) * 100 : 0}%`,
-            }}
-            title={`${highlight.label} — click to play from ${formatTime(highlight.start)}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSeek?.(highlight.start);
-            }}
-          />
-        ))}
-      </div>
-
-      <div className="pointer-events-none relative flex h-28 items-end gap-[2px]">
-        {(waveform.length ? waveform : new Array(80).fill(0.15)).map((bar, index) => (
-          <div
-            key={`${index}-${bar}`}
-            className="flex-1 rounded-full bg-[#91fff2]/75"
-            style={{ height: `${Math.max(bar * 100, 8)}%` }}
-          />
-        ))}
-      </div>
-
-      {duration > 0 && selection.end > selection.start ? (
-        <>
-          <button
-            type="button"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              dragStateRef.current = "start";
-            }}
-            className="absolute inset-y-[54px] z-10 w-4 -translate-x-1/2 cursor-ew-resize rounded-full border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
-            style={{ left: `${(selection.start / duration) * 100}%` }}
-            aria-label="Drag selection start"
-          />
-          <button
-            type="button"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              dragStateRef.current = "end";
-            }}
-            className="absolute inset-y-[54px] z-10 w-4 -translate-x-1/2 cursor-ew-resize rounded-full border border-[#ffd7eb]/70 bg-[#ff77c2] shadow-[0_0_18px_rgba(255,119,194,0.55)]"
-            style={{ left: `${(selection.end / duration) * 100}%` }}
-            aria-label="Drag selection end"
-          />
-        </>
-      ) : null}
-
-      <div className="mt-4 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.14em] text-[#91fff2]/45">
+      <div className="mt-4 flex items-center justify-between font-mono text-sm text-[#91fff2]/70">
         <span>0:00</span>
         <span>{formatTime(duration)}</span>
       </div>

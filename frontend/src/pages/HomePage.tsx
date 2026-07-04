@@ -25,14 +25,14 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden rounded-[28px] bg-[#070b10] px-4 py-6 scanlines sm:px-6">
+    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden bg-[#070b10] px-4 py-6 scanlines sm:px-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,43,157,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_30%)]" />
 
-      <section className="retro-shell relative mx-auto max-w-[1800px] rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
+      <section className="retro-shell relative mx-auto max-w-[1800px] px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10 flex flex-col gap-8">
           <div className="flex flex-col gap-5 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="font-retro text-xs tracking-[0.45em] text-[#1affe4]/60">
+              <p className="font-retro text-sm tracking-[0.45em] text-[#1affe4]/70">
                 CREATE NEW
               </p>
               <CrtStaticText
@@ -45,22 +45,17 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="retro-panel rounded-[24px] p-6">
+            <div className="retro-panel retro-panel--labeled p-6 pt-7">
+              <span className="retro-panel__label">NAME YOUR MIXTAPE</span>
               <div className="relative z-10">
-                <CrtStaticText
-                  as="h2"
-                  text="NAME YOUR MIXTAPE"
-                  textClassName="font-retro text-2xl tracking-[0.2em] text-[#1affe4]"
-                />
-
-                <form onSubmit={handleCreate} className="mt-6 flex flex-col gap-4">
+                <form onSubmit={handleCreate} className="flex flex-col gap-4">
                   <div>
-                    <label className="mb-2 block font-retro text-sm tracking-[0.22em] text-[#91fff2]">
+                    <label className="mb-2 block font-retro text-base tracking-[0.22em] text-[#91fff2]">
                       PROJECT NAME
                     </label>
                     <input
                       type="text"
-                      className="retro-input w-full rounded-xl px-4 py-3 font-mono text-sm tracking-[0.12em]"
+                      className="retro-input w-full px-4 py-3 font-mono text-sm tracking-[0.12em]"
                       placeholder="Friday Night Power Hour"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
@@ -71,7 +66,7 @@ export default function HomePage() {
                   <button
                     type="submit"
                     disabled={!newName.trim() || creating}
-                    className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 rounded-xl px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Plus className="h-4 w-4" />
                     <span className="crt-action__label" data-text={creating ? "CREATING..." : "CREATE PROJECT"}>
@@ -83,12 +78,12 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-col gap-4">
-              <div className="retro-panel rounded-[24px] p-5">
+              <div className="retro-panel retro-panel--labeled p-5 pt-6">
+                <span className="retro-panel__label">WORKS IN PROGRESS</span>
                 <div className="relative z-10">
-                  <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">WORKS IN PROGRESS</p>
                   <button
                     onClick={() => navigate("/works-in-progress")}
-                    className="crt-action retro-button-secondary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
+                    className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
                   >
                     <FolderOpen className="h-4 w-4" />
                     <span className="crt-action__label" data-text="OPEN WIP LIBRARY">
@@ -98,12 +93,12 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="retro-panel rounded-[24px] p-5">
+              <div className="retro-panel retro-panel--labeled p-5 pt-6">
+                <span className="retro-panel__label">FINISHED OUTPUTS</span>
                 <div className="relative z-10">
-                  <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">FINISHED OUTPUTS</p>
                   <button
                     onClick={() => navigate("/power-hours")}
-                    className="crt-action retro-button-secondary mt-5 inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
+                    className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
                   >
                     <Sparkles className="h-4 w-4" />
                     <span className="crt-action__label" data-text="OPEN MIXTAPE PLAYER">

@@ -55,11 +55,11 @@ export default function AutoGenerateProgressPage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,43,157,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_30%)]" />
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1800px] flex-col px-4 py-8 sm:px-6">
-        <div className="retro-shell flex flex-1 flex-col rounded-[28px] px-5 py-6 sm:px-8 sm:py-8">
+        <div className="retro-shell flex flex-1 flex-col px-5 py-6 sm:px-8 sm:py-8">
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex flex-col gap-4 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
-                <p className="font-retro text-xs tracking-[0.45em] text-[#1affe4]/60">
+                <p className="font-retro text-sm tracking-[0.45em] text-[#1affe4]/70">
                   AI AUTO GENERATE
                 </p>
                 <CrtStaticText
@@ -68,7 +68,7 @@ export default function AutoGenerateProgressPage() {
                   className="mt-2"
                   textClassName="font-retro text-4xl tracking-[0.18em] text-[#ff77c2] glow-text sm:text-5xl"
                 />
-                <p className="mt-4 font-mono text-sm uppercase tracking-[0.18em] text-[#91fff2]/50">
+                <p className="mt-4 font-mono text-base text-[#91fff2]/70">
                   Estimated time 12 minutes. So this should take about 5 or 10 minutes.
                 </p>
               </div>
@@ -77,7 +77,7 @@ export default function AutoGenerateProgressPage() {
                 {job?.project_id ? (
                   <Link
                     to={`/project/${job.project_id}`}
-                    className="crt-action retro-button-secondary inline-flex items-center gap-3 rounded-xl px-4 py-3 font-retro text-sm tracking-[0.16em]"
+                    className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
                   >
                     <span className="crt-action__label" data-text="OPEN PROJECT">
                       OPEN PROJECT
@@ -88,23 +88,24 @@ export default function AutoGenerateProgressPage() {
             </div>
 
             <div className="mt-6 flex flex-1 flex-col gap-6">
-              <section className="retro-panel rounded-[26px] p-6">
+              <section className="retro-panel retro-panel--labeled p-6 pt-8">
+                <span className="retro-panel__label">TRANSMISSION STATUS</span>
                 <div className="relative z-10">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="font-retro text-xl tracking-[0.18em] text-[#1affe4]">
                         {phaseCopy.title}
                       </p>
-                      <p className="mt-2 font-mono text-xs uppercase tracking-[0.16em] text-[#91fff2]/45">
+                      <p className="mt-2 font-mono text-sm text-[#91fff2]/70">
                         {phaseCopy.description}
                       </p>
                     </div>
-                    <div className="rounded-full border border-[#1affe4]/14 bg-[#08141b] px-3 py-1 font-retro text-xs tracking-[0.18em] text-[#91fff2]/70">
+                    <div className="retro-chip retro-chip--info text-xl">
                       {Math.round(job?.progress ?? 0)}%
                     </div>
                   </div>
 
-                  <div className="mt-6 h-5 overflow-hidden rounded-full border border-[#1affe4]/18 bg-[#08131a]">
+                  <div className="mt-6 h-5 border border-[#1affe4]/18 bg-[#08131a]">
                     <div
                       className="h-full bg-[linear-gradient(90deg,#1affe4_0%,#7ef8d1_35%,#ff77c2_100%)] shadow-[0_0_24px_rgba(26,255,228,0.28)] transition-all duration-700"
                       style={{ width: `${Math.max(4, Math.min(100, job?.progress ?? 4))}%` }}
@@ -133,23 +134,19 @@ export default function AutoGenerateProgressPage() {
                   ) : null}
 
                   <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="rounded-[22px] border border-[#1affe4]/10 bg-[#08131a]/90 p-5">
-                      <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">
-                        CURRENT TASK
-                      </p>
-                      <p className="mt-3 font-retro text-2xl tracking-[0.14em] text-[#ffb6dd]">
+                    <div className="relative border border-[#1affe4]/10 bg-[#08131a]/90 p-5 pt-6">
+                      <span className="retro-panel__label">CURRENT TASK</span>
+                      <p className="font-retro text-2xl tracking-[0.14em] text-[#ffb6dd]">
                         {job?.current_step || "Spinning up the tape deck"}
                       </p>
-                      <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                      <p className="mt-3 font-mono text-sm text-[#91fff2]/70">
                         {currentSong || "Loading the queue..."}
                       </p>
                     </div>
 
-                    <div className="rounded-[22px] border border-[#ff77c2]/12 bg-[#140913]/90 p-5">
-                      <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">
-                        JOB SNAPSHOT
-                      </p>
-                      <div className="mt-4 space-y-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+                    <div className="relative border border-[#ff77c2]/12 bg-[#140913]/90 p-5 pt-6">
+                      <span className="retro-panel__label retro-panel__label--pink">JOB SNAPSHOT</span>
+                      <div className="space-y-3 font-mono text-sm text-[#91fff2]/70">
                         <p>{job ? `${job.processed_clips} of ${job.total_clips} clips processed` : "Waiting for clip queue"}</p>
                         <p>{job?.render_id ? `Render job #${job.render_id} active` : "Render starts automatically after clipping"}</p>
                         <p>Background safe: you can leave this page and come back later.</p>
@@ -158,42 +155,42 @@ export default function AutoGenerateProgressPage() {
                   </div>
 
                   {job?.phase === "complete" ? (
-                    <div className="mt-6 rounded-[22px] border border-green-400/20 bg-green-500/10 p-5">
+                    <div className="mt-6 border border-green-400/20 bg-green-500/10 p-5">
                       <div className="flex items-center gap-3 font-retro text-lg tracking-[0.16em] text-green-300">
                         <CheckCircle2 className="h-5 w-5" />
                         FINAL RENDER COMPLETE
                       </div>
-                      <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-green-100/70">
+                      <p className="mt-3 font-mono text-sm text-green-100/80">
                         Your auto-generated power hour is ready.
                       </p>
                     </div>
                   ) : null}
 
                   {job?.phase === "error" ? (
-                    <div className="mt-6 rounded-[22px] border border-red-400/20 bg-red-500/10 p-5">
+                    <div className="mt-6 border border-red-400/20 bg-red-500/10 p-5">
                       <div className="flex items-center gap-3 font-retro text-lg tracking-[0.16em] text-red-200">
                         <AlertTriangle className="h-5 w-5" />
                         SOMETHING HIT STATIC
                       </div>
-                      <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-red-100/75">
+                      <p className="mt-3 font-mono text-sm text-red-100/85">
                         {job.error_message || "The AI generation run hit an error."}
                       </p>
                     </div>
                   ) : null}
 
                   {!job && !error ? (
-                    <div className="mt-6 flex items-center gap-3 font-retro text-sm tracking-[0.16em] text-[#91fff2]/70">
+                    <div className="mt-6 flex items-center gap-3 font-retro text-base tracking-[0.16em] text-[#91fff2]/70">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       WAITING FOR JOB STATUS...
                     </div>
                   ) : null}
 
                   {error ? (
-                    <div className="mt-6 rounded-[22px] border border-red-400/20 bg-red-500/10 p-5">
+                    <div className="mt-6 border border-red-400/20 bg-red-500/10 p-5">
                       <p className="font-retro text-lg tracking-[0.16em] text-red-200">
                         COULD NOT LOAD PROGRESS
                       </p>
-                      <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-red-100/75">
+                      <p className="mt-3 font-mono text-sm text-red-100/85">
                         {error}
                       </p>
                     </div>
@@ -246,25 +243,25 @@ function ProgressTile({
   body: string;
 }) {
   return (
-    <div className="retro-panel rounded-[22px] p-5">
+    <div className="retro-panel retro-panel--labeled p-5 pt-6">
+      <span className="retro-panel__label">{label}</span>
       <div className="relative z-10">
         <div className="flex items-center gap-3">
           <div className="text-[#ff77c2]">{icon}</div>
-          <p className="font-retro text-sm tracking-[0.18em] text-zinc-100">{label}</p>
           <span
             className={[
-              "ml-auto rounded-full px-2 py-0.5 font-retro text-[10px] tracking-[0.18em]",
+              "retro-chip ml-auto",
               complete
-                ? "bg-green-500/15 text-green-300"
+                ? "retro-chip--ok"
                 : active
-                  ? "bg-[#1affe4]/15 text-[#91fff2]"
-                  : "bg-zinc-800/80 text-zinc-400",
+                  ? "retro-chip--info"
+                  : "retro-chip--dim",
             ].join(" ")}
           >
             {complete ? "DONE" : active ? "LIVE" : "STANDBY"}
           </span>
         </div>
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-[#91fff2]/45">
+        <p className="mt-3 font-mono text-sm text-[#91fff2]/70">
           {body}
         </p>
       </div>
