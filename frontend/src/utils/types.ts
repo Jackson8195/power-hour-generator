@@ -136,6 +136,7 @@ export interface AutoGenerateJobProgress {
   render_id: number | null;
   output_path: string;
   error_message: string;
+  gpu_active?: boolean;
   updated_at: string;
 }
 

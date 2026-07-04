@@ -64,6 +64,7 @@ class AutoGenerateJob:
     render_id: int | None = None
     output_path: str = ""
     error_message: str = ""
+    gpu_active: bool = False
     updated_at: datetime = field(default_factory=datetime.utcnow)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -231,6 +232,7 @@ def job_to_response(job: AutoGenerateJob) -> dict:
         "render_id": job.render_id,
         "output_path": public_render_url(job.output_path) if job.output_path else "",
         "error_message": job.error_message,
+        "gpu_active": job.gpu_active,
         "updated_at": job.updated_at,
     }
 
@@ -878,6 +880,11 @@ async def _run_auto_render(job_id: str, project_id: int) -> None:
                 _AUTO_PROCESS_TASKS.add(task)
                 task.add_done_callback(_AUTO_PROCESS_TASKS.discard)
 
+            def on_encoder_selected(gpu_active: bool) -> None:
+                task = asyncio.create_task(job_store.update(job_id, gpu_active=gpu_active))
+                _AUTO_PROCESS_TASKS.add(task)
+                task.add_done_callback(_AUTO_PROCESS_TASKS.discard)
+
             pipeline = RenderPipeline(
                 clips=clip_data,
                 output_path=str(output_path),
@@ -885,6 +892,7 @@ async def _run_auto_render(job_id: str, project_id: int) -> None:
                 transition_type=request.transition_type,
                 include_countdown=request.include_countdown,
                 progress_callback=progress_callback,
+                on_encoder_selected=on_encoder_selected,
             )
             await pipeline.render()
 

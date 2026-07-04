@@ -330,6 +330,7 @@ class AutoGenerateJobProgressResponse(BaseModel):
     render_id: Optional[int] = None
     output_path: str = ""
     error_message: str = ""
+    gpu_active: bool = False
     updated_at: datetime
 
 

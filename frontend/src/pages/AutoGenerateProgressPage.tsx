@@ -111,6 +111,27 @@ export default function AutoGenerateProgressPage() {
                     />
                   </div>
 
+                  {job?.phase === "rendering" ? (
+                    <div className="mt-4">
+                      <span
+                        className={[
+                          "gpu-active-indicator",
+                          !job.gpu_active && "gpu-active-indicator--cpu",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        title={
+                          job.gpu_active
+                            ? "Encoding on the GPU (NVENC)"
+                            : "Encoding on the CPU (libx264)"
+                        }
+                      >
+                        <span className="gpu-active-indicator__light" />
+                        {job.gpu_active ? "GPU ENCODING ACTIVE" : "CPU ENCODING ACTIVE"}
+                      </span>
+                    </div>
+                  ) : null}
+
                   <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-[22px] border border-[#1affe4]/10 bg-[#08131a]/90 p-5">
                       <p className="font-retro text-sm tracking-[0.18em] text-zinc-200">
