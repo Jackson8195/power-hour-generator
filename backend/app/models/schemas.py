@@ -267,6 +267,9 @@ class ChangoverClipResponse(BaseModel):
 
 class AutoGenerateProposalCreate(BaseModel):
     prompt: str = Field(..., min_length=3, max_length=1000)
+    # False = resolve candidates via a plain YouTube search (no music-category
+    # filter/suffix/ranking), letting the AI surface non-music videos.
+    music: bool = True
 
 
 class AutoGenerateProposalReplaceRequest(BaseModel):

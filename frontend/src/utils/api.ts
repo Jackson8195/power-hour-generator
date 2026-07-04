@@ -57,11 +57,12 @@ export async function getRecommendedTracks(
 }
 
 export async function startAutoGenerateProposal(
-  prompt: string
+  prompt: string,
+  music = true
 ): Promise<AutoGenerateProposalJobStart> {
   return request("/api/auto-generate/proposals", {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, music }),
   });
 }
 

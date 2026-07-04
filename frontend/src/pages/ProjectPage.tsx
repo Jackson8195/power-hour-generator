@@ -71,6 +71,7 @@ export default function ProjectPage() {
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [musicOnly, setMusicOnly] = useState(true);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [recommendedResults, setRecommendedResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -191,7 +192,7 @@ export default function ProjectPage() {
 
     setSearching(true);
     try {
-      const results = await searchYouTube(searchQuery, 10, projectId);
+      const results = await searchYouTube(searchQuery, 10, projectId, musicOnly);
       setSearchResults(results);
     } catch (err) {
       console.error("Search failed:", err);
@@ -537,11 +538,11 @@ export default function ProjectPage() {
 
           {activeTab === "search" && (
             <div>
-          <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+          <form onSubmit={handleSearch} className="mb-2 flex gap-2">
             <input
               type="text"
               className="retro-input w-full px-4 py-3 font-mono text-sm tracking-[0.12em]"
-              placeholder="Search for music videos..."
+              placeholder={musicOnly ? "Search for music videos..." : "Search YouTube..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -560,6 +561,31 @@ export default function ProjectPage() {
               </span>
             </button>
           </form>
+
+          <label className="mb-4 inline-flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setMusicOnly((current) => !current)}
+              role="switch"
+              aria-checked={musicOnly}
+              className={[
+                "relative inline-flex h-5 w-9 shrink-0 items-center border transition-colors",
+                musicOnly
+                  ? "border-[#1affe4]/40 bg-[#1affe4]/15"
+                  : "border-[#ff77c2]/40 bg-[#ff77c2]/10",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "inline-block h-3 w-3 transform bg-current transition-transform",
+                  musicOnly ? "translate-x-[19px] text-[#1affe4]" : "translate-x-1 text-[#ff77c2]",
+                ].join(" ")}
+              />
+            </button>
+            <span className="font-mono text-sm tracking-[0.08em] text-[#91fff2]/70">
+              Music videos only
+            </span>
+          </label>
 
           {searchResults.length > 0 && (
             <div className="tracklist retro-panel--labeled mb-6 pt-2">

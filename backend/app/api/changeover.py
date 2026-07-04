@@ -58,8 +58,8 @@ def _to_response(row: ChangoverClipDB) -> ChangoverClipResponse:
     )
 
 
-def _delete_project_files(project_id: int) -> None:
-    """Delete all changeover media files for a project."""
+def delete_changeover_media_files(project_id: int) -> None:
+    """Delete all changeover media files for a project. Also used by project deletion."""
     changeover_dir = settings.changeover_dir
     for pattern in [
         f"project_{project_id}_image.*",
@@ -109,7 +109,7 @@ async def build_image_audio_changeover(
             raise HTTPException(status_code=422, detail=f"Audio type {aud_ext!r} not allowed")
 
     # Clean up old files
-    _delete_project_files(project_id)
+    delete_changeover_media_files(project_id)
 
     # Save uploads
     image_path = ""
@@ -196,7 +196,7 @@ async def start_youtube_changeover(
     if not youtube_id:
         raise HTTPException(status_code=422, detail="youtube_id is required")
 
-    _delete_project_files(project_id)
+    delete_changeover_media_files(project_id)
 
     result = await db.execute(
         select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
@@ -274,7 +274,7 @@ async def start_youtube_audio_changeover(
     if not youtube_id:
         raise HTTPException(status_code=422, detail="youtube_id is required")
 
-    _delete_project_files(project_id)
+    delete_changeover_media_files(project_id)
 
     result = await db.execute(
         select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
@@ -351,7 +351,7 @@ async def upload_video_changeover(
     if vid_ext not in _ALLOWED_VIDEO_EXTS:
         raise HTTPException(status_code=422, detail=f"Video type {vid_ext!r} not allowed")
 
-    _delete_project_files(project_id)
+    delete_changeover_media_files(project_id)
 
     raw_path = str(settings.changeover_dir / f"project_{project_id}_raw{vid_ext}")
     with open(raw_path, "wb") as f:
@@ -524,7 +524,7 @@ async def delete_changeover_clip(project_id: int, db: AsyncSession = Depends(get
     if not row:
         raise HTTPException(status_code=404, detail="No changeover clip for this project")
 
-    _delete_project_files(project_id)
+    delete_changeover_media_files(project_id)
     await db.delete(row)
     await db.commit()
     return {"status": "deleted"}

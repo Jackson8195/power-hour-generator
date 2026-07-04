@@ -493,12 +493,16 @@ class RenderPipeline:
                 f"enable='between(t,{appear_time},{appear_time + 0.9})'"
             )
 
-        # "DRINK!" text at the very end
+        # "DRINK!" text at the very end. The "1" digit's window is
+        # [clip_duration - 1, clip_duration - 0.1] (see loop above, i=1 is always
+        # included here since countdown_seconds >= 1), so start DRINK! right as
+        # "1" finishes instead of at a fixed offset that cut into it.
+        one_end_time = (clip_duration - 1) + 0.9
         filters.append(
             f"drawtext=text='DRINK!':"
             f"fontsize=100:fontcolor=yellow:borderw=4:bordercolor=black:"
             f"x=(w-text_w)/2:y=(h-text_h)/2:"
-            f"enable='between(t,{clip_duration - 0.5},{clip_duration})'"
+            f"enable='between(t,{one_end_time},{clip_duration})'"
         )
 
         return ",".join(filters)

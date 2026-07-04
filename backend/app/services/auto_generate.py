@@ -47,6 +47,7 @@ class StoredProposal:
     normalized_prompt: str
     items: list[AutoGenerateProposalItem]
     expires_at: datetime
+    music: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -237,29 +238,30 @@ def job_to_response(job: AutoGenerateJob) -> dict:
     }
 
 
-async def create_playlist_proposal(prompt: str) -> StoredProposal:
+async def create_playlist_proposal(prompt: str, music: bool = True) -> StoredProposal:
     """Create an ephemeral AI proposal and resolve it to YouTube-backed tracks."""
     normalized_prompt = " ".join(prompt.split())
-    items = await _build_resolved_items(normalized_prompt)
+    items = await _build_resolved_items(normalized_prompt, music=music)
     proposal = StoredProposal(
         proposal_id=uuid4().hex,
         prompt=prompt,
         normalized_prompt=normalized_prompt,
         items=items,
         expires_at=datetime.utcnow() + PROPOSAL_TTL,
+        music=music,
     )
     await proposal_store.save(proposal)
     return proposal
 
 
-async def start_proposal_job(prompt: str) -> ProposalJob:
+async def start_proposal_job(prompt: str, music: bool = True) -> ProposalJob:
     """Kick off create_playlist_proposal as a background task and return a job immediately."""
     job = ProposalJob(job_id=uuid4().hex, prompt=prompt)
     await proposal_job_store.save(job)
 
     async def _run() -> None:
         try:
-            proposal = await create_playlist_proposal(prompt)
+            proposal = await create_playlist_proposal(prompt, music=music)
             await proposal_job_store.update(job.job_id, status="complete", proposal_id=proposal.proposal_id)
         except Exception as exc:
             logger.error("Proposal job %s failed: %s", job.job_id, exc)
@@ -321,12 +323,14 @@ async def replace_playlist_item(proposal: StoredProposal, slot_index: int) -> Au
             original=original,
             exclude_song_keys=excluded_songs,
             count=8,
+            music=proposal.music,
         )
         replacement = await _resolve_candidates_to_item(
             slot_index=slot_index,
             candidates=alternates,
             used_song_keys=excluded_songs,
             used_youtube_ids=excluded_ids,
+            music=proposal.music,
         )
         if replacement and replacement.status == "resolved":
             return replacement
@@ -502,7 +506,7 @@ def start_auto_process_queue(job_id: str, project_id: int, clip_ids: Iterable[in
     return task
 
 
-async def _build_resolved_items(prompt: str) -> list[AutoGenerateProposalItem]:
+async def _build_resolved_items(prompt: str, music: bool = True) -> list[AutoGenerateProposalItem]:
     used_song_keys: set[str] = set()
     used_youtube_ids: set[str] = set()
     resolved_items: list[AutoGenerateProposalItem] = []
@@ -516,6 +520,7 @@ async def _build_resolved_items(prompt: str) -> list[AutoGenerateProposalItem]:
             prompt=prompt,
             exclude_song_keys=used_song_keys | {_song_key(song.artist, song.title) for song in unresolved_candidates},
             target_count=PLANNER_TARGET_COUNT,
+            music=music,
         )
         for candidate in planned:
             if len(resolved_items) >= PROPOSAL_SIZE:
@@ -525,6 +530,7 @@ async def _build_resolved_items(prompt: str) -> list[AutoGenerateProposalItem]:
                 candidates=[candidate],
                 used_song_keys=used_song_keys,
                 used_youtube_ids=used_youtube_ids,
+                music=music,
             )
             if not item:
                 continue
@@ -573,12 +579,13 @@ async def _resolve_candidates_to_item(
     candidates: list[PlannedSong],
     used_song_keys: set[str],
     used_youtube_ids: set[str],
+    music: bool = True,
 ) -> AutoGenerateProposalItem | None:
     for candidate in candidates:
         key = _song_key(candidate.artist, candidate.title)
         if not candidate.title or key in used_song_keys:
             continue
-        result = await _resolve_song(candidate)
+        result = await _resolve_song(candidate, music=music)
         if not result or result.youtube_id in used_youtube_ids:
             continue
         return AutoGenerateProposalItem(
@@ -608,9 +615,14 @@ async def _resolve_candidates_to_item(
     return None
 
 
-async def _resolve_song(candidate: PlannedSong) -> SearchResult | None:
+async def _resolve_song(candidate: PlannedSong, music: bool = True) -> SearchResult | None:
     query = " - ".join(part for part in [candidate.artist.strip(), candidate.title.strip()] if part)
-    results = await search_youtube(query, max_results=6, preferred_artists=[candidate.artist] if candidate.artist else None)
+    results = await search_youtube(
+        query,
+        max_results=6,
+        preferred_artists=[candidate.artist] if candidate.artist else None,
+        music=music,
+    )
     for result in results:
         if not result.youtube_id:
             continue
@@ -618,29 +630,44 @@ async def _resolve_song(candidate: PlannedSong) -> SearchResult | None:
     return None
 
 
-async def _plan_playlist(prompt: str, exclude_song_keys: set[str], target_count: int) -> list[PlannedSong]:
+async def _plan_playlist(
+    prompt: str,
+    exclude_song_keys: set[str],
+    target_count: int,
+    music: bool = True,
+) -> list[PlannedSong]:
     client = _get_openai_client()
     exclusion_text = _format_exclusions(exclude_song_keys)
+    if music:
+        system_content = (
+            "You are a music supervisor building a 60-song power hour playlist. "
+            "Return only strict JSON shaped as {\"tracks\": [{\"title\": string, \"artist\": string, \"reason\": string}]}. "
+            "Favor recognizable songs with likely official music videos. Avoid duplicates, live versions, lyric videos, karaoke, remixes unless requested. "
+            "Do not cluster the same artist repeatedly in sequence unless the user explicitly asks for a narrow artist-focused mix."
+        )
+    else:
+        system_content = (
+            "You are a video supervisor building a 60-clip power hour playlist from ordinary YouTube videos "
+            "(not necessarily music videos). "
+            "Return only strict JSON shaped as {\"tracks\": [{\"title\": string, \"artist\": string, \"reason\": string}]}, "
+            "using \"title\" for the video's subject/title and \"artist\" for the channel or creator if known (blank is fine). "
+            "Favor findable, recognizable videos that match the prompt. Avoid duplicates or near-identical clips."
+        )
     response = await client.chat.completions.create(
         model=settings.openai_model,
         response_format={"type": "json_object"},
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You are a music supervisor building a 60-song power hour playlist. "
-                    "Return only strict JSON shaped as {\"tracks\": [{\"title\": string, \"artist\": string, \"reason\": string}]}. "
-                    "Favor recognizable songs with likely official music videos. Avoid duplicates, live versions, lyric videos, karaoke, remixes unless requested. "
-                    "Do not cluster the same artist repeatedly in sequence unless the user explicitly asks for a narrow artist-focused mix."
-                ),
+                "content": system_content,
             },
             {
                 "role": "user",
                 "content": (
-                    f"Build {target_count} candidate songs for this power hour prompt: {prompt}\n"
+                    f"Build {target_count} candidate {'songs' if music else 'video clips'} for this power hour prompt: {prompt}\n"
                     "Keep variety unless the prompt explicitly asks for something narrow.\n"
-                    "Mix artists across the running order so the same artist does not play back to back when possible.\n"
-                    f"Avoid these already used songs: {exclusion_text}."
+                    "Mix sources across the running order so the same artist/creator does not play back to back when possible.\n"
+                    f"Avoid these already used entries: {exclusion_text}."
                 ),
             },
         ],
@@ -654,6 +681,7 @@ async def _plan_replacements(
     original: AutoGenerateProposalItem,
     exclude_song_keys: set[str],
     count: int,
+    music: bool = True,
 ) -> list[PlannedSong]:
     client = _get_openai_client()
     exclusion_text = _format_exclusions(exclude_song_keys)
@@ -665,7 +693,11 @@ async def _plan_replacements(
                 "role": "system",
                 "content": (
                     "You return only strict JSON shaped as {\"tracks\": [{\"title\": string, \"artist\": string, \"reason\": string}]}. "
-                    "Suggest replacements that preserve the same theme but are distinct songs."
+                    + (
+                        "Suggest replacements that preserve the same theme but are distinct songs."
+                        if music
+                        else "Suggest replacement YouTube videos (not necessarily music videos) that preserve the same theme but are distinct clips."
+                    )
                 ),
             },
             {

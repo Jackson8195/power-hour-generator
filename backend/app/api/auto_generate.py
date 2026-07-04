@@ -42,7 +42,7 @@ APPROVAL_FAILURE_MESSAGE = "AI playlist approval failed."
 async def create_proposal(payload: AutoGenerateProposalCreate):
     """Start a background AI proposal generation job and return its ID immediately."""
     try:
-        job = await start_proposal_job(payload.prompt)
+        job = await start_proposal_job(payload.prompt, music=payload.music)
         return AutoGenerateProposalJobStartResponse(proposal_job_id=job.job_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=PROPOSAL_FAILURE_MESSAGE) from exc

@@ -31,6 +31,7 @@ function formatSearchSourceLabel(source: string): string {
 export default function AutoGeneratePage() {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
+  const [musicOnly, setMusicOnly] = useState(true);
   const [projectName, setProjectName] = useState("");
   const [proposal, setProposal] = useState<AutoGenerateProposal | null>(null);
   const [activeJob, setActiveJob] = useState<{ jobId: string; projectId: number } | null>(null);
@@ -69,7 +70,7 @@ export default function AutoGeneratePage() {
     setGenerating(true);
     setError("");
     try {
-      const { proposal_job_id } = await startAutoGenerateProposal(prompt.trim());
+      const { proposal_job_id } = await startAutoGenerateProposal(prompt.trim(), musicOnly);
       while (true) {
         await new Promise((res) => setTimeout(res, 2000));
         const status = await getAutoGenerateProposalJob(proposal_job_id);
@@ -255,6 +256,36 @@ export default function AutoGeneratePage() {
                           className="retro-input w-full px-4 py-4 font-mono text-sm tracking-[0.12em]"
                           placeholder="Describe the genre, era, mood, energy, and any must-have constraints..."
                         />
+
+                        <label className="mt-4 flex items-center justify-between gap-3 border border-[#1affe4]/14 bg-[#08131a]/60 px-3 py-2.5">
+                          <span className="font-mono text-sm tracking-[0.08em] text-[#91fff2]/80">
+                            Music videos only
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setMusicOnly((current) => !current)}
+                            role="switch"
+                            aria-checked={musicOnly}
+                            className={[
+                              "relative inline-flex h-6 w-11 shrink-0 items-center border transition-colors",
+                              musicOnly
+                                ? "border-[#1affe4]/40 bg-[#1affe4]/15"
+                                : "border-[#ff77c2]/40 bg-[#ff77c2]/10",
+                            ].join(" ")}
+                          >
+                            <span
+                              className={[
+                                "inline-block h-4 w-4 transform bg-current transition-transform",
+                                musicOnly ? "translate-x-6 text-[#1affe4]" : "translate-x-1 text-[#ff77c2]",
+                              ].join(" ")}
+                            />
+                          </button>
+                        </label>
+                        <p className="mt-1.5 font-mono text-sm text-[#91fff2]/50">
+                          {musicOnly
+                            ? "Resolves songs to official music videos."
+                            : "Off: the AI can pull in regular YouTube videos, not just music videos."}
+                        </p>
 
                         <div className="mt-4 flex flex-wrap gap-3">
                           <button

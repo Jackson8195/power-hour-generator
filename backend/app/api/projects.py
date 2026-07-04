@@ -5,12 +5,13 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.changeover import delete_changeover_media_files
 from app.api.clip_utils import remove_clip_analysis, serialize_clip
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.security import unlink_managed_file
 from app.models.schemas import (
-    ProjectDB, ClipDB, ProjectCreate, ProjectResponse, ProjectDetail,
+    ChangoverClipDB, ProjectDB, ClipDB, RenderDB, ProjectCreate, ProjectResponse, ProjectDetail,
 )
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -75,10 +76,10 @@ async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete a project and all its clips."""
+    """Delete a project and all its clips, renders, and changeover media."""
     result = await db.execute(
         select(ProjectDB)
-        .options(selectinload(ProjectDB.clips))
+        .options(selectinload(ProjectDB.clips), selectinload(ProjectDB.renders))
         .where(ProjectDB.id == project_id)
     )
     project = result.scalar_one_or_none()
@@ -90,6 +91,20 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
         if clip.file_path:
             unlink_managed_file(clip.file_path, settings.media_dir)
         remove_clip_analysis(clip.id)
+
+    for render in project.renders:
+        if render.output_path:
+            unlink_managed_file(render.output_path, settings.render_dir)
+
+    # Changeover clips aren't a cascading relationship on ProjectDB, so clean them
+    # up explicitly (file + row) rather than leaving them orphaned.
+    delete_changeover_media_files(project_id)
+    changeover_result = await db.execute(
+        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+    )
+    changeover_row = changeover_result.scalar_one_or_none()
+    if changeover_row:
+        await db.delete(changeover_row)
 
     await db.delete(project)
     return {"status": "deleted", "project_id": project_id}
