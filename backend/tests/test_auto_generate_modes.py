@@ -117,3 +117,23 @@ def test_replacing_a_mixed_slot_keeps_its_kind(fake_ai):
     replacement = asyncio.run(ag.replace_playlist_item(proposal, 0))
     assert replacement.kind == "song"
     assert all(s["music"] is True for s in fake_ai.searches)
+
+
+def test_long_descriptive_prompts_are_accepted_but_not_unbounded():
+    from app.models.schemas import PROMPT_MAX_LENGTH
+
+    long_prompt = "American Idol power hour. " * 60  # ~1,500 chars: used to be rejected at 1,000
+    assert len(long_prompt) > 1000
+    assert AutoGenerateProposalCreate(prompt=long_prompt).prompt == long_prompt
+    with pytest.raises(Exception):
+        AutoGenerateProposalCreate(prompt="x" * (PROMPT_MAX_LENGTH + 1))
+
+
+def test_overlong_prompt_returns_a_readable_422(client):
+    from app.models.schemas import PROMPT_MAX_LENGTH
+
+    resp = client.post("/api/auto-generate/proposals", json={"prompt": "x" * (PROMPT_MAX_LENGTH + 1)})
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    # the frontend turns this list into text; make sure it carries a field path and message
+    assert detail[0]["loc"][-1] == "prompt" and "at most" in detail[0]["msg"]

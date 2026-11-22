@@ -60,6 +60,10 @@ choco install ffmpeg
 
 ### Docker local share
 
+> **GPU:** start with `scripts/docker-up.sh` (Windows PowerShell: `scripts/docker-up.ps1`) instead of
+> `docker compose up`. It detects an NVIDIA GPU with Docker's NVIDIA runtime and enables GPU
+> (NVENC) encoding automatically; on any other machine it starts normally and encodes on the CPU.
+
 For a casual local user, the easiest setup is Docker Desktop.
 
 Prerequisite:

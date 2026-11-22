@@ -22,6 +22,9 @@ import {
   startReplaceAutoGenerateProposalItem,
 } from "../utils/api";
 
+// Keep in sync with PROMPT_MAX_LENGTH in backend/app/models/schemas.py.
+const PROMPT_MAX_LENGTH = 4000;
+
 type TransitionMode = "default" | "ai" | "custom";
 type AiTransitionSources = "cards" | "youtube" | "both";
 
@@ -284,9 +287,13 @@ export default function AutoGeneratePage() {
                           value={prompt}
                           onChange={(e) => setPrompt(e.target.value)}
                           rows={10}
+                          maxLength={PROMPT_MAX_LENGTH}
                           className="retro-input w-full px-4 py-4 font-mono text-sm tracking-[0.12em]"
                           placeholder="Describe the genre, era, mood, energy, and any must-have constraints..."
                         />
+                        <p className="mt-1 text-right font-mono text-xs text-[#91fff2]/40">
+                          {prompt.length} / {PROMPT_MAX_LENGTH}
+                        </p>
 
                         <div
                           role="radiogroup"

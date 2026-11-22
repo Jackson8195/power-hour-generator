@@ -26,10 +26,10 @@ class Settings(BaseSettings):
 
     # FFmpeg
     ffmpeg_path: str = "ffmpeg"
-    # GPU encoding (opt-in). When true AND a working NVENC encoder is detected at
-    # runtime, renders use h264_nvenc; otherwise they fall back to libx264. This keeps
-    # CPU-only machines (e.g. Mac) unaffected even if the flag is accidentally set.
-    use_nvenc: bool = False
+    # GPU encoding, automatic by default. When true, each render does a tiny real NVENC test
+    # encode and uses h264_nvenc only if it works; otherwise it falls back to libx264. So CPU-only
+    # machines (e.g. Mac) just use the CPU. Set USE_NVENC=0 to force CPU encoding.
+    use_nvenc: bool = True
     nvenc_preset: str = "p5"  # NVENC preset p1 (fastest) .. p7 (slowest); p5 ≈ x264 "medium"
 
     # Download settings

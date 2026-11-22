@@ -46,7 +46,7 @@ Important environment constraints:
 - `scripts/start.sh` is expected to auto-use the project Node version when `nvm` is available
 - Newer Node builds may fail on this macOS version
 - Python 3.10+ is required; `python3` is the safer command to use for verification
-- GPU encoding is opt-in (`USE_NVENC=true`) and falls back to libx264 when NVENC isn't detected; never assume a GPU
+- GPU encoding is automatic: `USE_NVENC` defaults on, but each render does a real NVENC test encode and falls back to libx264, so CPU-only machines (Mac) just use the CPU; `USE_NVENC=0` forces CPU. In Docker the GPU must also be passed through, so start with `scripts/docker-up.sh` (or `.ps1`), which detects an NVIDIA GPU + Docker NVIDIA runtime and adds `docker-compose.gpu.yml`; a plain `docker compose up` has no GPU
 - Docker publishes the API on port 8000 to the LAN (needed for casting) and there is no auth; only run it on a trusted network
 - `librosa` is deliberately not in `requirements.txt` (conda on Mac via `start.sh`, pip in the Dockerfile)
 - `backend/.env` must use an async DB URL (`sqlite+aiosqlite:///...`); the test suite overrides env vars so it is unaffected

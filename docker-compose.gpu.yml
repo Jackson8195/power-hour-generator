@@ -10,11 +10,16 @@
 #   - Native Linux host: install the NVIDIA Container Toolkit:
 #       https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 #
-# Run with both files so this layers on top of the base compose:
+# Easiest: scripts/docker-up.sh (or scripts/docker-up.ps1 on Windows). It detects an NVIDIA
+# GPU + Docker's NVIDIA runtime and adds this file only when both are present.
+#
+# Or run with both files so this layers on top of the base compose:
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
 #
-# Verify the container can see the GPU:
-#   docker compose exec backend nvidia-smi
+# Verify the container can encode on the GPU (nvidia-smi is not injected on Docker Desktop /
+# WSL2, so test NVENC directly; no output and exit code 0 means it works):
+#   docker compose exec backend ffmpeg -hide_banner -loglevel error \
+#     -f lavfi -i color=c=black:s=1280x720:d=2 -c:v h264_nvenc -f null -
 services:
   backend:
     environment:

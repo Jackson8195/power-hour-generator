@@ -19,6 +19,28 @@ import type {
 
 const BASE = "";
 
+/** FastAPI sends a string for HTTPException but a list of objects for validation errors (422). */
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item) {
+          const loc = Array.isArray((item as { loc?: unknown[] }).loc)
+            ? (item as { loc: unknown[] }).loc.filter((part) => part !== "body").join(".")
+            : "";
+          const msg = String((item as { msg: unknown }).msg);
+          return loc ? `${loc}: ${msg}` : msg;
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (messages.length) return messages.join("; ");
+  }
+  return fallback;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { "Content-Type": "application/json" },
@@ -26,7 +48,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `Request failed: ${res.status}`);
+    throw new Error(formatErrorDetail(error.detail, `Request failed: ${res.status}`));
   }
   return res.json();
 }

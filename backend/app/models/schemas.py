@@ -96,6 +96,10 @@ class RenderDB(Base):
 
 # ─── Pydantic Schemas (API layer) ────────────────────────────────────
 
+# Long, descriptive AI playlist prompts (themes, seasons, examples, transition guidance) are
+# the point of the feature, so the limit is generous. The frontend textarea mirrors it.
+PROMPT_MAX_LENGTH = 4000
+
 class SearchQuery(BaseModel):
     query: str = Field(..., min_length=1, max_length=200)
     max_results: int = Field(default=10, ge=1, le=50)
@@ -274,7 +278,7 @@ class ChangoverClipResponse(BaseModel):
 
 
 class AutoGenerateProposalCreate(BaseModel):
-    prompt: str = Field(..., min_length=3, max_length=1000)
+    prompt: str = Field(..., min_length=3, max_length=PROMPT_MAX_LENGTH)
     # "music"  = songs only (music-category search + ranking)
     # "videos" = plain YouTube videos, no music assumptions
     # "mixed"  = the AI picks songs and non-music clips per slot, each resolved its own way
