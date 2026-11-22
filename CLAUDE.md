@@ -51,6 +51,8 @@ Important environment constraints:
 - `librosa` is deliberately not in `requirements.txt` (conda on Mac via `start.sh`, pip in the Dockerfile)
 - `backend/.env` must use an async DB URL (`sqlite+aiosqlite:///...`); the test suite overrides env vars so it is unaffected
 
+**Running the project:** when the user asks to run/start/rebuild the project, use `bash scripts/docker-up.sh` (it picks the GPU compose file automatically when an NVIDIA GPU is usable). Do not run plain `docker compose up`, which recreates the containers without GPU access. `scripts/start.sh` is only for running without Docker.
+
 Useful commands:
 
 ```bash
