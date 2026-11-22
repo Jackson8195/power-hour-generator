@@ -113,6 +113,7 @@ Invariants the tests in `backend/tests` pin down (keep them true):
 - Downloads are limited by `max_concurrent_downloads` (semaphore in `api/downloads.py`)
 - Starting a render returns `clips_included` / `clips_skipped` so the UI can warn about clips left out
 - Cancelling a render waits for the render task to unwind before deleting its DB row
+- Highlight analysis blends song scoring (loudness + onsets, beat snap) with a non-music activity score (presence + modulation, pause snap) by `music_likeness`; at likeness 1.0 it must reproduce the original song picks exactly. `beat_track` must keep using `y=` (its own median-aggregated onset envelope). `test_audio_analysis.py` skips if librosa isn't installed
 - Fire-and-forget `asyncio.create_task` calls must keep a reference (see `_spawn` in `api/changeover.py`)
 
 When changing backend behavior:
