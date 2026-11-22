@@ -78,6 +78,7 @@ export default function ProjectPage() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [renderNotice, setRenderNotice] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<number | null>(null);
   const renderWsRef = useRef<WebSocket | null>(null);
   const [activeTab, setActiveTab] = useState<"search" | "timeline">("search");
@@ -330,9 +331,15 @@ export default function ProjectPage() {
 
   async function handleStartRender() {
     setRenderError(null);
+    setRenderNotice(null);
     setRenderProgress(null);
     try {
-      const { render_id } = await startRender(projectId);
+      const { render_id, clips_included, clips_skipped } = await startRender(projectId);
+      if (clips_skipped.length > 0) {
+        setRenderNotice(
+          `Rendering ${clips_included} clip${clips_included === 1 ? "" : "s"}. Skipped ${clips_skipped.length} not ready or without a saved range: ${clips_skipped.join(", ")}`
+        );
+      }
       connectToRender(render_id);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Render failed";
@@ -407,6 +414,13 @@ export default function ProjectPage() {
             <div className="retro-panel retro-panel--labeled mb-6 p-5 pt-6">
               <span className="retro-panel__label" style={{ color: "#ff8080" }}>RENDER FAILED</span>
               <p className="font-mono text-sm tracking-[0.14em] text-[#ffb6dd]/90">{renderError}</p>
+            </div>
+          )}
+
+          {renderNotice && (
+            <div className="retro-panel retro-panel--labeled mb-6 p-5 pt-6">
+              <span className="retro-panel__label" style={{ color: "#ffd166" }}>HEADS UP</span>
+              <p className="font-mono text-sm tracking-[0.14em] text-[#ffe8a8]/90">{renderNotice}</p>
             </div>
           )}
 

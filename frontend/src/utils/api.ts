@@ -222,7 +222,7 @@ export async function startRender(
     transition_type?: string;
     include_countdown?: boolean;
   }
-): Promise<{ render_id: number }> {
+): Promise<{ render_id: number; clips_included: number; clips_skipped: string[] }> {
   return request(`/api/render/${projectId}`, {
     method: "POST",
     body: JSON.stringify(options ?? {}),
