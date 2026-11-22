@@ -85,7 +85,13 @@ export async function getAutoGenerateProposalJob(
 
 export async function approveAutoGenerateProposal(
   proposalId: string,
-  opts: { projectName?: string; projectId?: number | null; includeTransition?: boolean } = {}
+  opts: {
+    projectName?: string;
+    projectId?: number | null;
+    includeTransition?: boolean;
+    aiTransitionCount?: number;
+    aiTransitionSources?: "cards" | "youtube" | "both";
+  } = {}
 ): Promise<AutoGenerateApproval> {
   return request(`/api/auto-generate/proposals/${proposalId}/approve`, {
     method: "POST",
@@ -93,6 +99,8 @@ export async function approveAutoGenerateProposal(
       project_name: opts.projectName ?? "",
       project_id: opts.projectId ?? null,
       include_transition: opts.includeTransition ?? true,
+      ai_transition_count: opts.aiTransitionCount ?? 0,
+      ai_transition_sources: opts.aiTransitionSources ?? "both",
     }),
   });
 }

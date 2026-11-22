@@ -115,6 +115,8 @@ Invariants the tests in `backend/tests` pin down (keep them true):
 - Cancelling a render waits for the render task to unwind before deleting its DB row
 - Highlight analysis blends song scoring (loudness + onsets, beat snap) with a non-music activity score (presence + modulation, pause snap) by `music_likeness`; at likeness 1.0 it must reproduce the original song picks exactly. `beat_track` must keep using `y=` (its own median-aggregated onset envelope). `test_audio_analysis.py` skips if librosa isn't installed
 - AI proposals have a `mode` (`music` | `videos` | `mixed`) and each item a `kind` (`song` | `clip`). Songs resolve with music search/ranking, clips with plain search; in mixed mode the AI picks the kind per slot and replacing a slot keeps its kind. The legacy `music` boolean is still accepted when `mode` is omitted
+- Changeovers: a project has at most one `origin="manual"` row (all `/api/changeover` endpoints touch only that one) and any number of `origin="ai"` rows. Render cycles through all ready rows in `position` order. AI text goes to ffmpeg only via files (`build_text_card`, `expansion=none`), colors only from `PALETTE`, and an AI YouTube transition that fails falls back to a card. A manual changeover always wins over `ai_transition_count`
+- Schema changes that `create_all` can't apply go in `core/migrations.py` (idempotent, run before `create_all`); the changeover-table rebuild is the example
 - `_measure_loudnorm` must treat non-finite stats (silent audio) as a failed measurement, so silent cards render with single-pass loudnorm
 - Fire-and-forget `asyncio.create_task` calls must keep a reference (see `_spawn` in `api/changeover.py`)
 

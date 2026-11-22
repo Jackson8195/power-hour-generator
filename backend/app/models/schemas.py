@@ -230,8 +230,13 @@ class ChangoverClipDB(Base):
     __tablename__ = "changover_clips"
 
     id            = Column(Integer, primary_key=True, autoincrement=True)
-    project_id    = Column(Integer, ForeignKey("projects.id"), nullable=False, unique=True)
-    source_type   = Column(String(20), default="image_audio")  # image_audio | youtube | local_video
+    # A project has at most one "manual" (user-configured) changeover and any number of
+    # "ai" ones, which the renderer cycles through in ``position`` order.
+    project_id    = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    origin        = Column(String(10), default="manual", nullable=False)  # manual | ai
+    position      = Column(Integer, default=0, nullable=False)
+    label         = Column(String(100), default="")
+    source_type   = Column(String(20), default="image_audio")  # image_audio | youtube | local_video | default_shot | ai_card | ai_youtube
     youtube_id    = Column(String(50), default="")
     image_path    = Column(String(500), default="")
     audio_path    = Column(String(500), default="")
@@ -262,6 +267,9 @@ class ChangoverClipResponse(BaseModel):
     error_message: str
     preview_url: str = ""
     raw_video_url: str = ""
+    origin: str = "manual"
+    position: int = 0
+    label: str = ""
     model_config = {"from_attributes": True}
 
 
@@ -292,6 +300,11 @@ class AutoGenerateProposalApproveRequest(BaseModel):
     # Insert a transition between songs. If no custom changeover was configured, a
     # default 3·2·1 → "SHOT!" card is built at approve time.
     include_transition: bool = True
+    # Let the AI create its own transition clips (instead of the default card) and cycle
+    # through them between songs. 0 = off. Ignored if a custom transition already exists.
+    ai_transition_count: int = Field(default=0, ge=0, le=8)
+    # "cards" = generated text cards, "youtube" = found clips, "both" = a mix.
+    ai_transition_sources: Literal["cards", "youtube", "both"] = "both"
 
 
 class AutoGenerateProjectResponse(BaseModel):

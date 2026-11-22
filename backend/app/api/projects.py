@@ -102,8 +102,7 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
     changeover_result = await db.execute(
         select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
     )
-    changeover_row = changeover_result.scalar_one_or_none()
-    if changeover_row:
+    for changeover_row in changeover_result.scalars().all():
         await db.delete(changeover_row)
 
     await db.delete(project)

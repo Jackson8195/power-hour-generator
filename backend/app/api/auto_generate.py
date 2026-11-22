@@ -15,6 +15,7 @@ from app.models.schemas import (
     AutoGenerateProposalJobStatusResponse,
     AutoGenerateProposalReplaceRequest,
     AutoGenerateReplaceJobStartResponse,
+    ChangoverClipDB,
     ClipDB,
     ClipStatus,
     ProjectDB,
@@ -22,6 +23,7 @@ from app.models.schemas import (
 )
 from app.services.changeover import ensure_default_changeover
 from app.services.auto_generate import (
+    AiTransitionRequest,
     create_auto_generate_job,
     job_store,
     job_to_response,
@@ -176,12 +178,28 @@ async def approve_proposal(
         else:
             project_id, clip_ids = await _create_project_and_clips(db, proposal, payload.project_name)
 
-        # Build the default 3·2·1 → "SHOT!" card unless a custom changeover already exists.
+        # A custom (manual) changeover always wins. Otherwise either let the AI create a
+        # varied set of transitions (built just before rendering), or fall back to the
+        # default 3·2·1 → "SHOT!" card.
+        ai_transitions = None
         if payload.include_transition:
-            await ensure_default_changeover(db, project_id)
+            manual = await db.execute(
+                select(ChangoverClipDB.id)
+                .where(ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual")
+                .limit(1)
+            )
+            has_manual = manual.scalar_one_or_none() is not None
+            if payload.ai_transition_count > 0 and not has_manual:
+                ai_transitions = AiTransitionRequest(
+                    theme=proposal.prompt,
+                    count=payload.ai_transition_count,
+                    sources=payload.ai_transition_sources,
+                )
+            else:
+                await ensure_default_changeover(db, project_id)
 
         job = await create_auto_generate_job(project_id, len(clip_ids))
-        start_auto_process_queue(job.job_id, project_id, clip_ids)
+        start_auto_process_queue(job.job_id, project_id, clip_ids, transitions=ai_transitions)
         return AutoGenerateApprovalResponse(project_id=project_id, job_id=job.job_id, clip_ids=clip_ids)
     except HTTPException:
         raise

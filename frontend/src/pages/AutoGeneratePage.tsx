@@ -22,6 +22,21 @@ import {
   startReplaceAutoGenerateProposalItem,
 } from "../utils/api";
 
+type TransitionMode = "default" | "ai" | "custom";
+type AiTransitionSources = "cards" | "youtube" | "both";
+
+const TRANSITION_OPTIONS: { value: TransitionMode; label: string }[] = [
+  { value: "default", label: "DEFAULT SHOT" },
+  { value: "ai", label: "AI CREATES" },
+  { value: "custom", label: "CUSTOM CLIP" },
+];
+
+const TRANSITION_HELP: Record<TransitionMode, string> = {
+  default: "Default: a 3·2·1 countdown into a SHOT! card.",
+  ai: "The AI creates several different transitions and cycles through them.",
+  custom: "Custom clip — build it below.",
+};
+
 const MODE_OPTIONS: { value: AutoGenerateMode; label: string; help: string }[] = [
   { value: "music", label: "Music videos", help: "Songs only, resolved to official music videos." },
   { value: "videos", label: "Any videos", help: "Regular YouTube videos, with no music assumptions." },
@@ -53,7 +68,10 @@ export default function AutoGeneratePage() {
   // Transition (changeover) config, chosen before approval.
   // OFF (default): backend builds a default 3·2·1 → "SHOT!" card.
   // ON: pre-create the project so the full builder can attach a custom clip.
-  const [includeCustomTransition, setIncludeCustomTransition] = useState(false);
+  const [transitionMode, setTransitionMode] = useState<TransitionMode>("default");
+  const [aiTransitionCount, setAiTransitionCount] = useState(4);
+  const [aiTransitionSources, setAiTransitionSources] = useState<AiTransitionSources>("both");
+  const includeCustomTransition = transitionMode === "custom";
   const [transitionProjectId, setTransitionProjectId] = useState<number | null>(null);
   const [preparingTransition, setPreparingTransition] = useState(false);
 
@@ -88,7 +106,7 @@ export default function AutoGeneratePage() {
           setProposal(status.proposal);
           // A new proposal invalidates any pre-created transition project.
           setTransitionProjectId(null);
-          setIncludeCustomTransition(false);
+          setTransitionMode((mode) => (mode === "custom" ? "default" : mode));
           if (!projectName.trim()) {
             setProjectName(buildDefaultProjectName(status.proposal.normalized_prompt));
           }
@@ -119,7 +137,7 @@ export default function AutoGeneratePage() {
           // Replacing a song changes the clip list; a pre-created transition
           // project would be stale, so reset it.
           setTransitionProjectId(null);
-          setIncludeCustomTransition(false);
+          setTransitionMode((mode) => (mode === "custom" ? "default" : mode));
           break;
         }
         if (status.status === "error") {
@@ -133,12 +151,13 @@ export default function AutoGeneratePage() {
     }
   }
 
-  async function handleToggleCustomTransition() {
-    const next = !includeCustomTransition;
-    setIncludeCustomTransition(next);
-    // Turning it on the first time pre-creates the project so the builder has a
+  async function handleSelectTransitionMode(next: TransitionMode) {
+    if (next === transitionMode || preparingTransition) return;
+    const previous = transitionMode;
+    setTransitionMode(next);
+    // Choosing "custom" the first time pre-creates the project so the builder has a
     // real project id to attach the changeover clip to.
-    if (next && transitionProjectId === null && proposal) {
+    if (next === "custom" && transitionProjectId === null && proposal) {
       setPreparingTransition(true);
       setError("");
       try {
@@ -148,7 +167,7 @@ export default function AutoGeneratePage() {
         );
         setTransitionProjectId(project_id);
       } catch (err) {
-        setIncludeCustomTransition(false);
+        setTransitionMode(previous);
         setError(err instanceof Error ? err.message : "Failed to prepare transition builder");
       } finally {
         setPreparingTransition(false);
@@ -167,6 +186,8 @@ export default function AutoGeneratePage() {
         // (avoids orphaning it); backend falls back to the default SHOT card.
         projectId: transitionProjectId,
         includeTransition: true,
+        aiTransitionCount: transitionMode === "ai" ? aiTransitionCount : 0,
+        aiTransitionSources,
       });
       const nextJob = { jobId: result.job_id, projectId: result.project_id };
       window.localStorage.setItem("power-hour-active-ai-job", JSON.stringify(nextJob));
@@ -389,47 +410,75 @@ export default function AutoGeneratePage() {
                                   TRANSITION BETWEEN CLIPS
                                 </p>
                                 <p className="mt-1 font-mono text-sm text-[#91fff2]/60">
-                                  {includeCustomTransition
-                                    ? "Custom clip — build it below."
-                                    : "Default: a 3·2·1 countdown into a SHOT! card."}
+                                  {TRANSITION_HELP[transitionMode]}
                                 </p>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleToggleCustomTransition}
-                              disabled={preparingTransition}
-                              role="switch"
-                              aria-checked={includeCustomTransition}
-                              className="relative inline-flex h-9 w-56 shrink-0 items-stretch border border-[#1affe4]/20 bg-[#08131a] font-retro text-sm tracking-[0.12em] transition-all disabled:opacity-50"
+                            <div
+                              role="radiogroup"
+                              aria-label="Transition type"
+                              className="relative inline-flex h-9 w-full shrink-0 items-stretch border border-[#1affe4]/20 bg-[#08131a] font-retro text-sm tracking-[0.12em] sm:w-96"
                             >
                               {preparingTransition ? (
                                 <span className="mx-auto inline-flex items-center gap-2 text-[#91fff2]/70">
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> PREPARING…
                                 </span>
                               ) : (
-                                <>
-                                  <span
+                                TRANSITION_OPTIONS.map((option, index) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={transitionMode === option.value}
+                                    onClick={() => handleSelectTransitionMode(option.value)}
                                     className={[
                                       "flex flex-1 items-center justify-center transition-colors",
-                                      !includeCustomTransition ? "bg-[#1affe4]/15 text-[#defffb]" : "text-[#91fff2]/45",
+                                      index > 0 ? "border-l border-[#1affe4]/20" : "",
+                                      transitionMode === option.value
+                                        ? option.value === "custom"
+                                          ? "bg-[#ff2b9d]/20 text-[#ffd7eb]"
+                                          : "bg-[#1affe4]/15 text-[#defffb]"
+                                        : "text-[#91fff2]/45 hover:text-[#91fff2]/80",
                                     ].join(" ")}
                                   >
-                                    DEFAULT SHOT
-                                  </span>
-                                  <span className="w-px shrink-0 bg-[#1affe4]/20" />
-                                  <span
-                                    className={[
-                                      "flex flex-1 items-center justify-center transition-colors",
-                                      includeCustomTransition ? "bg-[#ff2b9d]/20 text-[#ffd7eb]" : "text-[#91fff2]/45",
-                                    ].join(" ")}
-                                  >
-                                    CUSTOM CLIP
-                                  </span>
-                                </>
+                                    {option.label}
+                                  </button>
+                                ))
                               )}
-                            </button>
+                            </div>
                           </div>
+
+                          {transitionMode === "ai" && (
+                            <div className="mt-4 grid gap-3 border-t border-[#1affe4]/14 pt-4 sm:grid-cols-2">
+                              <label className="flex items-center justify-between gap-3 font-mono text-sm tracking-[0.08em] text-[#91fff2]/80">
+                                How many different transitions
+                                <select
+                                  value={aiTransitionCount}
+                                  onChange={(e) => setAiTransitionCount(Number(e.target.value))}
+                                  className="retro-input px-2 py-1.5 font-mono text-sm"
+                                >
+                                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                                    <option key={n} value={n}>{n}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="flex items-center justify-between gap-3 font-mono text-sm tracking-[0.08em] text-[#91fff2]/80">
+                                Made from
+                                <select
+                                  value={aiTransitionSources}
+                                  onChange={(e) => setAiTransitionSources(e.target.value as AiTransitionSources)}
+                                  className="retro-input px-2 py-1.5 font-mono text-sm"
+                                >
+                                  <option value="both">Cards + YouTube clips</option>
+                                  <option value="cards">Generated cards only</option>
+                                  <option value="youtube">YouTube clips only</option>
+                                </select>
+                              </label>
+                              <p className="font-mono text-sm text-[#91fff2]/50 sm:col-span-2">
+                                The AI designs these from your prompt just before rendering, then cycles through them between songs. YouTube clips that can't be fetched fall back to a generated card.
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {includeCustomTransition && transitionProjectId !== null && (

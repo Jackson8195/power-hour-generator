@@ -64,6 +64,9 @@ def _to_response(row: ChangoverClipDB) -> ChangoverClipResponse:
         error_message=row.error_message or "",
         preview_url=_preview_url(row.output_path or ""),
         raw_video_url=_raw_video_url(row.raw_video_path or ""),
+        origin=row.origin or "manual",
+        position=row.position or 0,
+        label=row.label or "",
     )
 
 
@@ -75,6 +78,7 @@ def delete_changeover_media_files(project_id: int) -> None:
         f"project_{project_id}_audio.*",
         f"project_{project_id}_raw.*",
         f"project_{project_id}_changeover.mp4",
+        f"project_{project_id}_ai_*",
     ]:
         for f in changeover_dir.glob(pattern):
             f.unlink(missing_ok=True)
@@ -85,7 +89,9 @@ def delete_changeover_media_files(project_id: int) -> None:
 @router.get("/{project_id}", response_model=ChangoverClipResponse)
 async def get_changeover_clip(project_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if not row:
@@ -138,7 +144,9 @@ async def build_image_audio_changeover(
 
     # Upsert DB row
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if row:
@@ -208,7 +216,9 @@ async def start_youtube_changeover(
     delete_changeover_media_files(project_id)
 
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if row:
@@ -248,7 +258,9 @@ async def start_youtube_changeover(
 async def _download_changeover_video(project_id: int, youtube_id: str) -> None:
     async with async_session() as db:
         result = await db.execute(
-            select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+            select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
         )
         row = result.scalar_one_or_none()
         if not row:
@@ -286,7 +298,9 @@ async def start_youtube_audio_changeover(
     delete_changeover_media_files(project_id)
 
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if row:
@@ -326,7 +340,9 @@ async def start_youtube_audio_changeover(
 async def _download_changeover_audio(project_id: int, youtube_id: str) -> None:
     async with async_session() as db:
         result = await db.execute(
-            select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+            select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
         )
         row = result.scalar_one_or_none()
         if not row:
@@ -367,7 +383,9 @@ async def upload_video_changeover(
         f.write(await video.read())
 
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if row:
@@ -416,7 +434,9 @@ async def build_video_changeover(
     duration = float(body.get("duration", 0.0))
 
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if not row:
@@ -494,7 +514,9 @@ async def set_changeover_image(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if not row:
@@ -527,7 +549,9 @@ async def set_changeover_image(
 @router.delete("/{project_id}")
 async def delete_changeover_clip(project_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB).where(
+            ChangoverClipDB.project_id == project_id, ChangoverClipDB.origin == "manual"
+        )
     )
     row = result.scalar_one_or_none()
     if not row:

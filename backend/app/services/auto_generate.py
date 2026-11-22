@@ -484,7 +484,44 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
                 return False
 
 
-def start_auto_process_queue(job_id: str, project_id: int, clip_ids: Iterable[int]) -> asyncio.Task:
+@dataclass
+class AiTransitionRequest:
+    theme: str
+    count: int
+    sources: str = "both"
+
+
+async def _create_ai_transitions_step(job_id: str, project_id: int, request: AiTransitionRequest) -> None:
+    """Build the AI's transition clips before rendering; falls back to the default card."""
+    from app.core.database import async_session
+    from app.services.ai_transitions import create_ai_transitions
+    from app.services.changeover import ensure_default_changeover
+
+    await job_store.update(
+        job_id,
+        phase="processing",
+        progress=70.0,
+        current_step="Creating transition clips",
+        current_title="",
+        current_artist="",
+    )
+    try:
+        async with async_session() as db:
+            ready = await create_ai_transitions(
+                db, project_id, request.theme, request.count, request.sources
+            )
+            if ready == 0:
+                await ensure_default_changeover(db, project_id)
+    except Exception as exc:
+        logger.error("AI transition step failed for project %s: %s", project_id, exc)
+
+
+def start_auto_process_queue(
+    job_id: str,
+    project_id: int,
+    clip_ids: Iterable[int],
+    transitions: AiTransitionRequest | None = None,
+) -> asyncio.Task:
     """Start sequential processing for a newly approved AI playlist."""
 
     async def _run() -> None:
@@ -504,6 +541,9 @@ def start_auto_process_queue(job_id: str, project_id: int, clip_ids: Iterable[in
         if ready_count == 0:
             await _mark_job_error(job_id, "No clips finished processing, so rendering could not start.")
             return
+
+        if transitions:
+            await _create_ai_transitions_step(job_id, project_id, transitions)
 
         await _run_auto_render(job_id, project_id)
 

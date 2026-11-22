@@ -16,37 +16,43 @@ logger = logging.getLogger(__name__)
 async def apply_changeover_interleave(
     db: AsyncSession, project_id: int, clip_data: list[dict]
 ) -> list[dict]:
-    """Insert the project's changeover clip between each pair of song clips.
+    """Insert the project's changeover clips between each pair of song clips.
 
-    Returns ``clip_data`` unchanged when the project has no usable ("ready" with a
-    built output file) changeover clip, or when there are fewer than two clips to
-    sit a changeover between. Interleaved changeover entries are flagged with
+    With one usable changeover it repeats between every pair; with several (AI-created) it
+    cycles through them in ``position`` order. Returns ``clip_data`` unchanged when the
+    project has no usable ("ready" with a built output file) changeover, or when there are
+    fewer than two clips to sit one between. Interleaved entries are flagged with
     ``is_changeover`` so the render pipeline skips the countdown/DRINK overlay.
     """
     if len(clip_data) < 2:
         return clip_data
 
     result = await db.execute(
-        select(ChangoverClipDB).where(
+        select(ChangoverClipDB)
+        .where(
             ChangoverClipDB.project_id == project_id,
             ChangoverClipDB.status == "ready",
         )
+        .order_by(ChangoverClipDB.position, ChangoverClipDB.id)
     )
-    changover = result.scalar_one_or_none()
-
-    if not (changover and changover.output_path and Path(changover.output_path).exists()):
+    changeovers = [
+        row for row in result.scalars().all()
+        if row.output_path and Path(row.output_path).exists()
+    ]
+    if not changeovers:
         return clip_data
 
     interleaved: list[dict] = []
     for i, clip in enumerate(clip_data):
         interleaved.append(clip)
         if i < len(clip_data) - 1:
+            changeover = changeovers[i % len(changeovers)]
             interleaved.append(
                 {
-                    "file_path": changover.output_path,
+                    "file_path": changeover.output_path,
                     "start_time": 0.0,
-                    "end_time": changover.duration,
-                    "title": "SHOT!",
+                    "end_time": changeover.duration,
+                    "title": changeover.label or "SHOT!",
                     "is_changeover": True,
                 }
             )
@@ -63,7 +69,7 @@ async def ensure_default_changeover(
     built), it is left untouched — the interleave uses it only when it is "ready".
     """
     result = await db.execute(
-        select(ChangoverClipDB).where(ChangoverClipDB.project_id == project_id)
+        select(ChangoverClipDB.id).where(ChangoverClipDB.project_id == project_id).limit(1)
     )
     if result.scalar_one_or_none() is not None:
         return

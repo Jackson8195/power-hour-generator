@@ -204,6 +204,91 @@ async def build_changeover_clip(
     return str(output)
 
 
+def _card_font_size(text: str, width: int, height: int, max_ratio: float) -> int:
+    """Largest font size (<= max_ratio of frame height) that keeps ``text`` inside ~90% of the width."""
+    fit = int((width * 0.9) / (0.6 * max(len(text), 1)))
+    return max(24, min(int(height * max_ratio), fit))
+
+
+async def build_text_card(
+    output_path: str,
+    countdown: list[str],
+    headline: str,
+    subline: str = "",
+    text_color: str = "#FFFF00",
+    bg_color: str = "#000000",
+    duration: float = 4.0,
+    resolution: str = "1280x720",
+) -> str:
+    """Build a generated transition card: optional countdown words (1s each), then a headline.
+
+    All text goes to ffmpeg through files with ``expansion=none`` rather than into the filter
+    string, so AI-written text can never break or inject into the filter graph. Colors must be
+    ``#RRGGBB`` (callers validate).
+    """
+    import tempfile
+
+    w, h = map(int, resolution.split("x"))
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fg = "0x" + text_color.lstrip("#")
+    bg = "0x" + bg_color.lstrip("#")
+    headline_start = float(len(countdown))
+    duration = max(duration, headline_start + 1.5)
+
+    with tempfile.TemporaryDirectory(prefix="ph_card_") as tmp:
+        tmp_dir = Path(tmp)
+
+        def text_file(name: str, content: str) -> str:
+            path = tmp_dir / name
+            path.write_text(content, encoding="utf-8")
+            return str(path)
+
+        def draw(file_path: str, size: int, y: str, enable: str) -> str:
+            # file paths are ours (tempdir) so they contain no filter metacharacters
+            return (
+                f"drawtext=textfile={file_path}:expansion=none:fontsize={size}:fontcolor={fg}:"
+                f"borderw=6:bordercolor=black:x=(w-text_w)/2:y={y}:enable='{enable}'"
+            )
+
+        draws = []
+        for idx, word in enumerate(countdown):
+            f = text_file(f"count_{idx}.txt", word)
+            size = _card_font_size(word, w, h, 0.45)
+            draws.append(draw(f, size, "(h-text_h)/2", f"between(t,{idx},{idx + 1})"))
+
+        head_size = _card_font_size(headline, w, h, 0.3)
+        head_y = "(h-text_h)/2" if not subline else "(h-text_h)/2-h*0.06"
+        draws.append(draw(text_file("headline.txt", headline), head_size, head_y, f"gte(t,{headline_start})"))
+        if subline:
+            sub_size = _card_font_size(subline, w, h, 0.09)
+            draws.append(
+                draw(text_file("subline.txt", subline), sub_size, f"(h/2)+h*0.14", f"gte(t,{headline_start})")
+            )
+
+        cmd = [
+            settings.ffmpeg_path, "-y",
+            "-f", "lavfi", "-i", f"color=c={bg}:s={w}x{h}:r=30",
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+            "-t", str(duration),
+            "-vf", ",".join(draws),
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+            "-r", "30", "-movflags", "+faststart",
+            "-shortest",
+            str(output),
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        logger.error(f"FFmpeg text card build failed: {stderr.decode()[-500:]}")
+        raise RuntimeError(f"Failed to build text card: {stderr.decode()[-200:]}")
+    return str(output)
+
+
 async def build_default_shot_card(
     output_path: str,
     duration: float = 4.0,
