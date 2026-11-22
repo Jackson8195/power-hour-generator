@@ -33,6 +33,18 @@ def _clip_output_path(clip_id: int, youtube_id: str) -> Path:
     return settings.clips_dir / f"{safe_stem}_{clip_id}.mp4"
 
 
+def _clamp_range(clip: ClipDB, start: float, end: float) -> tuple[float, float]:
+    """Keep a selection inside the current media file and make sure it is non-empty."""
+    duration = float(clip.duration or 0.0)
+    if duration > 0:
+        if start >= duration:
+            raise HTTPException(status_code=400, detail="start_time is beyond the end of the video")
+        end = min(end, duration)
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end_time must be greater than start_time")
+    return start, end
+
+
 def _remove_media_file(file_path: str) -> None:
     if file_path:
         unlink_managed_file(file_path, settings.media_dir)
@@ -76,13 +88,12 @@ async def update_clip(
     if update.position is not None:
         clip.position = update.position
 
-    if update.start_time is not None:
-        clip.start_time = max(0.0, update.start_time)
-    if update.end_time is not None:
-        clip.end_time = max(0.0, update.end_time)
-
-    if (update.start_time is not None or update.end_time is not None) and clip.end_time <= clip.start_time:
-        raise HTTPException(status_code=400, detail="end_time must be greater than start_time")
+    if update.start_time is not None or update.end_time is not None:
+        start = max(0.0, update.start_time if update.start_time is not None else clip.start_time)
+        end = max(0.0, update.end_time if update.end_time is not None else clip.end_time)
+        start, end = _clamp_range(clip, start, end)
+        clip.start_time = start
+        clip.end_time = end
 
     await db.flush()
     await db.refresh(clip)
@@ -147,8 +158,7 @@ async def commit_selection(
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    if selection.end_time <= selection.start_time:
-        raise HTTPException(status_code=400, detail="end_time must be greater than start_time")
+    start_time, end_time = _clamp_range(clip, selection.start_time, selection.end_time)
 
     if not clip.file_path:
         raise HTTPException(status_code=400, detail="No source media available for this clip")
@@ -163,8 +173,8 @@ async def commit_selection(
     await extract_clip_segment(
         source_path=str(source_file_path),
         output_path=str(output_path),
-        start_time=selection.start_time,
-        end_time=selection.end_time,
+        start_time=start_time,
+        end_time=end_time,
     )
 
     if source_file_path != output_path:
@@ -172,7 +182,7 @@ async def commit_selection(
 
     remove_clip_analysis(clip.id)
     clip.file_path = str(output_path)
-    clip.duration = selection.end_time - selection.start_time
+    clip.duration = end_time - start_time
     clip.start_time = 0.0
     clip.end_time = clip.duration
     clip.suggested_start = None

@@ -388,7 +388,9 @@ async def auto_process_clip(clip_id: int, job_id: str, clip_index: int, total_cl
                 clip.error_message = ""
                 await db.commit()
 
-                dl_result = await download_video(clip.youtube_id)
+                dl_result = await download_video(
+                    clip.youtube_id, file_stem=f"{clip.youtube_id}_{clip.id}"
+                )
                 source_file_path = dl_result["file_path"]
                 resolved_source = resolve_managed_path(source_file_path, settings.media_dir)
                 if not resolved_source or not resolved_source.exists():

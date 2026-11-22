@@ -17,6 +17,15 @@ from app.services.youtube import download_video, download_audio_only
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/changeover", tags=["changeover"])
 
+# Hold references so fire-and-forget tasks aren't garbage-collected mid-run.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
 _ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 _ALLOWED_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg"}
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
@@ -232,7 +241,7 @@ async def start_youtube_changeover(
     await db.commit()
     await db.refresh(row)
 
-    asyncio.create_task(_download_changeover_video(project_id, youtube_id))
+    _spawn(_download_changeover_video(project_id, youtube_id))
     return _to_response(row)
 
 
@@ -310,7 +319,7 @@ async def start_youtube_audio_changeover(
     await db.commit()
     await db.refresh(row)
 
-    asyncio.create_task(_download_changeover_audio(project_id, youtube_id))
+    _spawn(_download_changeover_audio(project_id, youtube_id))
     return _to_response(row)
 
 

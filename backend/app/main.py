@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.recovery import recover_interrupted_jobs
 from app.core.storage import migrate_storage_layout
 from app.api import search, downloads, clips, projects, render, cast, auto_generate, changeover
 
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     settings.ensure_dirs()
     await migrate_storage_layout()
+    await recover_interrupted_jobs()
     logger.info(f"   Media dir: {settings.media_dir.resolve()}")
     logger.info(f"   Render dir: {settings.render_dir.resolve()}")
     logger.info("   Database initialized")

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -30,7 +31,7 @@ _render_gpu: dict[int, bool] = {}
 
 
 def _build_output_path(project_name: str, project_id: int, render_id: int) -> Path:
-    safe_name = project_name.lower().replace(" ", "_")
+    safe_name = re.sub(r"[^a-z0-9]+", "_", project_name.lower()).strip("_")[:60] or "project"
     filename = f"power_hour_{safe_name}_{project_id}_render_{render_id}.mp4"
     return settings.render_dir / filename
 
@@ -59,6 +60,12 @@ async def start_render(
     ready_clips = [
         c for c in project.clips
         if c.status == ClipStatus.READY and c.file_path and c.end_time > c.start_time
+    ]
+    ready_ids = {c.id for c in ready_clips}
+    skipped_clips = [
+        c.source_title or f"Clip {c.id}"
+        for c in sorted(project.clips, key=lambda c: c.position)
+        if c.id not in ready_ids
     ]
     if not ready_clips:
         raise HTTPException(status_code=400, detail="No reviewed clips with a selected range to render")
@@ -107,7 +114,12 @@ async def start_render(
     task = asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request))
     _render_tasks[render_id] = task
 
-    return {"render_id": render_id, "status": "queued"}
+    return {
+        "render_id": render_id,
+        "status": "queued",
+        "clips_included": len(ready_clips),
+        "clips_skipped": skipped_clips,
+    }
 
 
 async def _run_render(
@@ -195,7 +207,7 @@ async def get_active_render(project_id: int, db: AsyncSession = Depends(get_db))
         .where(RenderDB.status.in_([RenderStatus.QUEUED, RenderStatus.RENDERING]))
         .order_by(RenderDB.id.desc())
     )
-    render = result.scalar_one_or_none()
+    render = result.scalars().first()
     if not render:
         return None
     return {"render_id": render.id, "status": render.status}
@@ -207,6 +219,12 @@ async def cancel_render(render_id: int, db: AsyncSession = Depends(get_db)):
     task = _render_tasks.pop(render_id, None)
     if task:
         task.cancel()
+        # Let the render task unwind (it swallows CancelledError) before its DB row is
+        # deleted, so it can't commit against a row that no longer exists.
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=10)
+        except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+            pass
 
     result = await db.execute(select(RenderDB).where(RenderDB.id == render_id))
     render = result.scalar_one_or_none()
@@ -273,7 +291,9 @@ async def render_progress_ws(websocket: WebSocket, render_id: int):
                         select(RenderDB).where(RenderDB.id == render_id)
                     )
                     render = result.scalar_one_or_none()
-                    if render:
+                    if not render:
+                        break
+                    else:
                         await websocket.send_json({
                             "render_id": render_id,
                             "progress": render.progress,

@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 
 # Track active downloads
-_active_downloads: dict[str, asyncio.Task] = {}
+_active_downloads: dict[int, asyncio.Task] = {}
+_download_slots = asyncio.Semaphore(settings.max_concurrent_downloads)
 
 
 DOWNLOAD_FAILURE_MESSAGE = "Download or analysis failed for this clip."
@@ -34,7 +35,7 @@ async def start_download(clip_id: int, db: AsyncSession = Depends(get_db)):
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    if clip.youtube_id in _active_downloads:
+    if clip_id in _active_downloads:
         return {"status": "already_downloading", "clip_id": clip_id}
 
     if clip.file_path:
@@ -48,7 +49,7 @@ async def start_download(clip_id: int, db: AsyncSession = Depends(get_db)):
 
     # Start download in background
     task = asyncio.create_task(_download_and_analyze(clip_id, clip.youtube_id))
-    _active_downloads[clip.youtube_id] = task
+    _active_downloads[clip_id] = task
 
     return {"status": "started", "clip_id": clip_id}
 
@@ -64,11 +65,12 @@ async def _download_and_analyze(clip_id: int, youtube_id: str):
             return
 
         try:
-            # Download
+            # Download (waits for a free slot; the clip shows as downloading meanwhile)
             clip.status = ClipStatus.DOWNLOADING
             await db.commit()
 
-            dl_result = await download_video(youtube_id)
+            async with _download_slots:
+                dl_result = await download_video(youtube_id, file_stem=f"{youtube_id}_{clip_id}")
             source_file_path = dl_result["file_path"]
             resolved_source = resolve_managed_path(source_file_path, settings.media_dir)
             if not resolved_source or not resolved_source.exists():
@@ -107,7 +109,7 @@ async def _download_and_analyze(clip_id: int, youtube_id: str):
             await db.commit()
 
         finally:
-            _active_downloads.pop(youtube_id, None)
+            _active_downloads.pop(clip_id, None)
 
 
 @router.get("/{clip_id}/status")

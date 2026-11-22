@@ -276,13 +276,20 @@ async def download_video(
     youtube_id: str,
     output_dir: Optional[Path] = None,
     quality: Optional[int] = None,
+    file_stem: Optional[str] = None,
 ) -> dict:
-    """Download a YouTube video using yt-dlp."""
+    """Download a YouTube video using yt-dlp.
+
+    ``file_stem`` names the output file (defaults to the video id). Callers that can
+    have several clips of the same video pass a per-clip stem so the clips never
+    share, or delete, each other's source file.
+    """
+    file_stem = file_stem or youtube_id
     output_dir = output_dir or settings.downloads_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     quality = quality or settings.default_video_quality
 
-    output_template = str(output_dir / f"{youtube_id}.%(ext)s")
+    output_template = str(output_dir / f"{file_stem}.%(ext)s")
     url = f"https://www.youtube.com/watch?v={youtube_id}"
 
     cmd = [
@@ -313,7 +320,7 @@ async def download_video(
     file_path = (
         data.get("requested_downloads", [{}])[0].get("filepath")
         or data.get("_filename")
-        or _resolve_downloaded_file(output_dir, youtube_id)
+        or _resolve_downloaded_file(output_dir, file_stem)
     )
 
     return {
