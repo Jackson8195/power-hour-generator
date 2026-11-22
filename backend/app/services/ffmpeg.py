@@ -5,6 +5,7 @@ and final concatenation into a Power Hour video.
 """
 
 import asyncio
+import math
 import json
 import logging
 import re
@@ -472,6 +473,17 @@ class RenderPipeline:
         required = {"input_i", "input_lra", "input_tp", "input_thresh", "target_offset"}
         if not required.issubset(data.keys()):
             logger.warning(f"loudnorm pass 1 missing keys for {file_path}: got {set(data.keys())}")
+            return None
+
+        # Silent audio (generated cards, quiet intros) measures as "-inf"/"nan", which the second
+        # pass rejects ("Numerical result out of range"). Treat that as a failed measurement so
+        # the caller falls back to single-pass loudnorm.
+        try:
+            if not all(math.isfinite(float(data[key])) for key in required):
+                logger.info(f"loudnorm pass 1 measured silence for {file_path}; using single-pass")
+                return None
+        except (TypeError, ValueError):
+            logger.warning(f"loudnorm pass 1 returned non-numeric stats for {file_path}")
             return None
 
         return data

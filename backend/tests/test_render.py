@@ -62,3 +62,36 @@ def test_cancel_render_deletes_row_and_file(client, project_id, db, media_file):
     assert client.delete(f"/api/render/{render_id}").status_code == 200
     assert not out.exists()
     assert client.delete(f"/api/render/{render_id}").status_code == 404
+
+
+def _measure(monkeypatch, stats_json: str):
+    """Run RenderPipeline._measure_loudnorm against a fake ffmpeg that prints ``stats_json``."""
+    import asyncio
+
+    from app.services.ffmpeg import RenderPipeline
+
+    class FakeProc:
+        returncode = 0
+
+        async def communicate(self):
+            return b"", f"[Parsed_loudnorm_0 @ 0x1]\n{stats_json}\n".encode()
+
+    async def fake_exec(*cmd, **_):
+        return FakeProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    pipeline = RenderPipeline(clips=[], output_path="x.mp4", resolution="640x360",
+                              transition_type="crossfade", include_countdown=False)
+    return asyncio.run(pipeline._measure_loudnorm("clip.mp4", 0.0, 4.0))
+
+
+def test_loudnorm_measurement_of_silence_falls_back_to_single_pass(monkeypatch):
+    silent = ('{"input_i": "-inf", "input_tp": "-inf", "input_lra": "0.00", '
+              '"input_thresh": "-70.00", "target_offset": "inf"}')
+    assert _measure(monkeypatch, silent) is None  # caller then uses single-pass loudnorm
+
+
+def test_loudnorm_measurement_of_normal_audio_is_kept(monkeypatch):
+    normal = ('{"input_i": "-14.20", "input_tp": "-0.50", "input_lra": "6.10", '
+              '"input_thresh": "-24.30", "target_offset": "0.40"}')
+    assert _measure(monkeypatch, normal)["input_i"] == "-14.20"

@@ -1,5 +1,6 @@
 """Storage layout migration helpers."""
 
+import re
 from pathlib import Path
 
 from sqlalchemy import select
@@ -91,3 +92,9 @@ async def _migrate_render_files(db) -> None:
             target = settings.render_dir / source.name
             if not target.exists():
                 source.replace(target)
+
+
+def build_render_output_path(project_name: str, project_id: int, render_id: int) -> Path:
+    """Render output path with the user-supplied project name reduced to a safe slug."""
+    safe_name = re.sub(r"[^a-z0-9]+", "_", project_name.lower()).strip("_")[:60] or "project"
+    return settings.render_dir / f"power_hour_{safe_name}_{project_id}_render_{render_id}.mp4"

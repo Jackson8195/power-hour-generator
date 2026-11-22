@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.database import get_db, async_session
 from app.core.security import public_render_url
+from app.core.storage import build_render_output_path
 from app.models.schemas import (
     ProjectDB, ClipDB, RenderDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
 )
@@ -31,9 +31,7 @@ _render_gpu: dict[int, bool] = {}
 
 
 def _build_output_path(project_name: str, project_id: int, render_id: int) -> Path:
-    safe_name = re.sub(r"[^a-z0-9]+", "_", project_name.lower()).strip("_")[:60] or "project"
-    filename = f"power_hour_{safe_name}_{project_id}_render_{render_id}.mp4"
-    return settings.render_dir / filename
+    return build_render_output_path(project_name, project_id, render_id)
 
 
 def _build_output_url(output_path: str) -> str:

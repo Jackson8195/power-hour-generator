@@ -14,6 +14,7 @@ from openai import AsyncOpenAI
 from app.api.clip_utils import remove_clip_analysis
 from app.core.config import settings
 from app.core.security import public_render_url, resolve_managed_path, unlink_managed_file
+from app.core.storage import build_render_output_path
 from app.models.schemas import AutoGenerateProposalItem, SearchResult
 from app.services.audio_analysis import analyze_audio
 from app.services.changeover import apply_changeover_interleave
@@ -905,7 +906,7 @@ async def _run_auto_render(job_id: str, project_id: int) -> None:
         db.add(render)
         await db.flush()
         await db.refresh(render)
-        output_path = settings.render_dir / f"power_hour_{project.name.lower().replace(' ', '_')}_{project_id}_render_{render.id}.mp4"
+        output_path = build_render_output_path(project.name, project_id, render.id)
         render.output_path = str(output_path)
         await db.commit()
 
