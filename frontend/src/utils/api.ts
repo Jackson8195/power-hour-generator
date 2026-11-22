@@ -2,6 +2,7 @@ import type {
   AutoGenerateApproval,
   AutoGenerateProject,
   AutoGenerateJobProgress,
+  AutoGenerateMode,
   AutoGenerateProposalJobStart,
   AutoGenerateProposalJobStatus,
   AutoGenerateReplaceJobStart,
@@ -58,11 +59,11 @@ export async function getRecommendedTracks(
 
 export async function startAutoGenerateProposal(
   prompt: string,
-  music = true
+  mode: AutoGenerateMode = "music"
 ): Promise<AutoGenerateProposalJobStart> {
   return request("/api/auto-generate/proposals", {
     method: "POST",
-    body: JSON.stringify({ prompt, music }),
+    body: JSON.stringify({ prompt, mode }),
   });
 }
 

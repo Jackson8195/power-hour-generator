@@ -38,6 +38,7 @@ class PlannedSong:
     title: str
     artist: str
     reason: str = ""
+    kind: str = "song"  # "song" (music search) or "clip" (plain YouTube search)
 
 
 @dataclass
@@ -47,7 +48,7 @@ class StoredProposal:
     normalized_prompt: str
     items: list[AutoGenerateProposalItem]
     expires_at: datetime
-    music: bool = True
+    mode: str = "music"  # "music" | "videos" | "mixed"
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -213,6 +214,7 @@ def proposal_to_response(proposal: StoredProposal) -> dict:
     return {
         "proposal_id": proposal.proposal_id,
         "normalized_prompt": proposal.normalized_prompt,
+        "mode": proposal.mode,
         "items": proposal.items,
         "unresolved_count": unresolved_count,
         "expires_at": proposal.expires_at,
@@ -238,30 +240,30 @@ def job_to_response(job: AutoGenerateJob) -> dict:
     }
 
 
-async def create_playlist_proposal(prompt: str, music: bool = True) -> StoredProposal:
+async def create_playlist_proposal(prompt: str, mode: str = "music") -> StoredProposal:
     """Create an ephemeral AI proposal and resolve it to YouTube-backed tracks."""
     normalized_prompt = " ".join(prompt.split())
-    items = await _build_resolved_items(normalized_prompt, music=music)
+    items = await _build_resolved_items(normalized_prompt, mode=mode)
     proposal = StoredProposal(
         proposal_id=uuid4().hex,
         prompt=prompt,
         normalized_prompt=normalized_prompt,
         items=items,
         expires_at=datetime.utcnow() + PROPOSAL_TTL,
-        music=music,
+        mode=mode,
     )
     await proposal_store.save(proposal)
     return proposal
 
 
-async def start_proposal_job(prompt: str, music: bool = True) -> ProposalJob:
+async def start_proposal_job(prompt: str, mode: str = "music") -> ProposalJob:
     """Kick off create_playlist_proposal as a background task and return a job immediately."""
     job = ProposalJob(job_id=uuid4().hex, prompt=prompt)
     await proposal_job_store.save(job)
 
     async def _run() -> None:
         try:
-            proposal = await create_playlist_proposal(prompt, music=music)
+            proposal = await create_playlist_proposal(prompt, mode=mode)
             await proposal_job_store.update(job.job_id, status="complete", proposal_id=proposal.proposal_id)
         except Exception as exc:
             logger.error("Proposal job %s failed: %s", job.job_id, exc)
@@ -316,6 +318,8 @@ async def replace_playlist_item(proposal: StoredProposal, slot_index: int) -> Au
     excluded_songs = _song_keys_from_items(existing_items)
     excluded_ids = {item.youtube_id for item in existing_items if item.youtube_id}
     original = proposal.items[slot_index]
+    # In mixed mode a slot keeps its own kind (a song is replaced by a song, a clip by a clip).
+    slot_mode = _slot_mode(proposal.mode, original.kind)
 
     for _ in range(MAX_REPLACEMENT_ATTEMPTS):
         alternates = await _plan_replacements(
@@ -323,14 +327,13 @@ async def replace_playlist_item(proposal: StoredProposal, slot_index: int) -> Au
             original=original,
             exclude_song_keys=excluded_songs,
             count=8,
-            music=proposal.music,
+            mode=slot_mode,
         )
         replacement = await _resolve_candidates_to_item(
             slot_index=slot_index,
             candidates=alternates,
             used_song_keys=excluded_songs,
             used_youtube_ids=excluded_ids,
-            music=proposal.music,
         )
         if replacement and replacement.status == "resolved":
             return replacement
@@ -347,6 +350,7 @@ async def replace_playlist_item(proposal: StoredProposal, slot_index: int) -> Au
         resolution_source=original.resolution_source,
         reason=original.reason,
         status="unresolved",
+        kind=original.kind,
     )
 
 
@@ -508,7 +512,7 @@ def start_auto_process_queue(job_id: str, project_id: int, clip_ids: Iterable[in
     return task
 
 
-async def _build_resolved_items(prompt: str, music: bool = True) -> list[AutoGenerateProposalItem]:
+async def _build_resolved_items(prompt: str, mode: str = "music") -> list[AutoGenerateProposalItem]:
     used_song_keys: set[str] = set()
     used_youtube_ids: set[str] = set()
     resolved_items: list[AutoGenerateProposalItem] = []
@@ -522,7 +526,7 @@ async def _build_resolved_items(prompt: str, music: bool = True) -> list[AutoGen
             prompt=prompt,
             exclude_song_keys=used_song_keys | {_song_key(song.artist, song.title) for song in unresolved_candidates},
             target_count=PLANNER_TARGET_COUNT,
-            music=music,
+            mode=mode,
         )
         for candidate in planned:
             if len(resolved_items) >= PROPOSAL_SIZE:
@@ -532,7 +536,6 @@ async def _build_resolved_items(prompt: str, music: bool = True) -> list[AutoGen
                 candidates=[candidate],
                 used_song_keys=used_song_keys,
                 used_youtube_ids=used_youtube_ids,
-                music=music,
             )
             if not item:
                 continue
@@ -555,6 +558,7 @@ async def _build_resolved_items(prompt: str, music: bool = True) -> list[AutoGen
                 requested_artist=candidate.artist,
                 reason=candidate.reason,
                 status="unresolved",
+                kind=candidate.kind,
             )
         )
 
@@ -581,13 +585,12 @@ async def _resolve_candidates_to_item(
     candidates: list[PlannedSong],
     used_song_keys: set[str],
     used_youtube_ids: set[str],
-    music: bool = True,
 ) -> AutoGenerateProposalItem | None:
     for candidate in candidates:
         key = _song_key(candidate.artist, candidate.title)
         if not candidate.title or key in used_song_keys:
             continue
-        result = await _resolve_song(candidate, music=music)
+        result = await _resolve_song(candidate)
         if not result or result.youtube_id in used_youtube_ids:
             continue
         return AutoGenerateProposalItem(
@@ -602,6 +605,7 @@ async def _resolve_candidates_to_item(
             resolution_source=result.search_source,
             reason=candidate.reason,
             status="resolved",
+            kind=candidate.kind,
         )
 
     if candidates:
@@ -612,18 +616,19 @@ async def _resolve_candidates_to_item(
             requested_artist=fallback.artist,
             reason=fallback.reason,
             status="unresolved",
+            kind=fallback.kind,
         )
 
     return None
 
 
-async def _resolve_song(candidate: PlannedSong, music: bool = True) -> SearchResult | None:
+async def _resolve_song(candidate: PlannedSong) -> SearchResult | None:
     query = " - ".join(part for part in [candidate.artist.strip(), candidate.title.strip()] if part)
     results = await search_youtube(
         query,
         max_results=6,
         preferred_artists=[candidate.artist] if candidate.artist else None,
-        music=music,
+        music=candidate.kind == "song",
     )
     for result in results:
         if not result.youtube_id:
@@ -636,11 +641,22 @@ async def _plan_playlist(
     prompt: str,
     exclude_song_keys: set[str],
     target_count: int,
-    music: bool = True,
+    mode: str = "music",
 ) -> list[PlannedSong]:
     client = _get_openai_client()
     exclusion_text = _format_exclusions(exclude_song_keys)
-    if music:
+    if mode == "mixed":
+        system_content = (
+            "You are a supervisor building a 60-item power hour playlist that mixes songs with ordinary YouTube clips "
+            "(movie scenes, comedy bits, sports moments, speeches, etc.). "
+            "Return only strict JSON shaped as {\"tracks\": [{\"kind\": \"song\" | \"clip\", \"title\": string, \"artist\": string, \"reason\": string}]}. "
+            "For kind \"song\", use the song title and artist and favor recognizable songs with likely official music videos "
+            "(avoid live versions, lyric videos, karaoke, remixes unless requested). "
+            "For kind \"clip\", use \"title\" for the video's subject/title and \"artist\" for the channel or creator if known (blank is fine). "
+            "Follow the user's prompt for the balance and placement of songs versus clips; if it doesn't say, mostly songs with some clips mixed in. "
+            "Avoid duplicates, and do not cluster the same artist/creator repeatedly in sequence."
+        )
+    elif mode == "music":
         system_content = (
             "You are a music supervisor building a 60-song power hour playlist. "
             "Return only strict JSON shaped as {\"tracks\": [{\"title\": string, \"artist\": string, \"reason\": string}]}. "
@@ -666,7 +682,7 @@ async def _plan_playlist(
             {
                 "role": "user",
                 "content": (
-                    f"Build {target_count} candidate {'songs' if music else 'video clips'} for this power hour prompt: {prompt}\n"
+                    f"Build {target_count} candidate {_MODE_NOUN[mode]} for this power hour prompt: {prompt}\n"
                     "Keep variety unless the prompt explicitly asks for something narrow.\n"
                     "Mix sources across the running order so the same artist/creator does not play back to back when possible.\n"
                     f"Avoid these already used entries: {exclusion_text}."
@@ -675,7 +691,7 @@ async def _plan_playlist(
         ],
     )
     payload = json.loads(response.choices[0].message.content or "{}")
-    return _dedupe_planned_songs(payload.get("tracks", []))
+    return _dedupe_planned_songs(payload.get("tracks", []), mode)
 
 
 async def _plan_replacements(
@@ -683,8 +699,10 @@ async def _plan_replacements(
     original: AutoGenerateProposalItem,
     exclude_song_keys: set[str],
     count: int,
-    music: bool = True,
+    mode: str = "music",
 ) -> list[PlannedSong]:
+    # Replacements are always single-kind: in mixed mode the caller passes the slot's own kind.
+    music = mode == "music"
     client = _get_openai_client()
     exclusion_text = _format_exclusions(exclude_song_keys)
     response = await client.chat.completions.create(
@@ -713,7 +731,7 @@ async def _plan_replacements(
         ],
     )
     payload = json.loads(response.choices[0].message.content or "{}")
-    return _dedupe_planned_songs(payload.get("tracks", []))
+    return _dedupe_planned_songs(payload.get("tracks", []), mode)
 
 
 def _get_openai_client() -> AsyncOpenAI:
@@ -722,7 +740,25 @@ def _get_openai_client() -> AsyncOpenAI:
     return AsyncOpenAI(api_key=settings.openai_api_key)
 
 
-def _dedupe_planned_songs(raw_tracks: list[dict]) -> list[PlannedSong]:
+_MODE_NOUN = {"music": "songs", "videos": "video clips", "mixed": "songs and video clips"}
+
+
+def _slot_mode(proposal_mode: str, item_kind: str) -> str:
+    """Mode used to plan/resolve one slot; mixed proposals keep each slot's own kind."""
+    if proposal_mode == "mixed":
+        return "music" if item_kind == "song" else "videos"
+    return proposal_mode
+
+
+def _planned_kind(mode: str, raw_kind: object) -> str:
+    if mode == "music":
+        return "song"
+    if mode == "videos":
+        return "clip"
+    return "clip" if str(raw_kind).strip().lower() == "clip" else "song"
+
+
+def _dedupe_planned_songs(raw_tracks: list[dict], mode: str = "music") -> list[PlannedSong]:
     songs: list[PlannedSong] = []
     seen: set[str] = set()
     for raw_track in raw_tracks:
@@ -735,7 +771,9 @@ def _dedupe_planned_songs(raw_tracks: list[dict]) -> list[PlannedSong]:
         if key in seen:
             continue
         seen.add(key)
-        songs.append(PlannedSong(title=title, artist=artist, reason=reason))
+        songs.append(
+            PlannedSong(title=title, artist=artist, reason=reason, kind=_planned_kind(mode, raw_track.get("kind")))
+        )
     return songs
 
 

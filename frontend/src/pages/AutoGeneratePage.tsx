@@ -13,7 +13,7 @@ import {
 import CrtStaticText from "../components/CrtStaticText";
 import BackButton from "../components/BackButton";
 import ChangeoverBuilder from "../components/ChangeoverBuilder";
-import type { AutoGenerateProposal } from "../utils/types";
+import type { AutoGenerateMode, AutoGenerateProposal } from "../utils/types";
 import {
   approveAutoGenerateProposal,
   createProjectForProposal,
@@ -21,6 +21,16 @@ import {
   startAutoGenerateProposal,
   startReplaceAutoGenerateProposalItem,
 } from "../utils/api";
+
+const MODE_OPTIONS: { value: AutoGenerateMode; label: string; help: string }[] = [
+  { value: "music", label: "Music videos", help: "Songs only, resolved to official music videos." },
+  { value: "videos", label: "Any videos", help: "Regular YouTube videos, with no music assumptions." },
+  {
+    value: "mixed",
+    label: "Mixed",
+    help: "The AI chooses songs and non-music clips per slot, following your prompt.",
+  },
+];
 
 function formatSearchSourceLabel(source: string): string {
   if (source === "youtube_api") return "YOUTUBE API";
@@ -31,7 +41,7 @@ function formatSearchSourceLabel(source: string): string {
 export default function AutoGeneratePage() {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
-  const [musicOnly, setMusicOnly] = useState(true);
+  const [mode, setMode] = useState<AutoGenerateMode>("music");
   const [projectName, setProjectName] = useState("");
   const [proposal, setProposal] = useState<AutoGenerateProposal | null>(null);
   const [activeJob, setActiveJob] = useState<{ jobId: string; projectId: number } | null>(null);
@@ -70,7 +80,7 @@ export default function AutoGeneratePage() {
     setGenerating(true);
     setError("");
     try {
-      const { proposal_job_id } = await startAutoGenerateProposal(prompt.trim(), musicOnly);
+      const { proposal_job_id } = await startAutoGenerateProposal(prompt.trim(), mode);
       while (true) {
         await new Promise((res) => setTimeout(res, 2000));
         const status = await getAutoGenerateProposalJob(proposal_job_id);
@@ -257,34 +267,34 @@ export default function AutoGeneratePage() {
                           placeholder="Describe the genre, era, mood, energy, and any must-have constraints..."
                         />
 
-                        <label className="mt-4 flex items-center justify-between gap-3 border border-[#1affe4]/14 bg-[#08131a]/60 px-3 py-2.5">
-                          <span className="font-mono text-sm tracking-[0.08em] text-[#91fff2]/80">
-                            Music videos only
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setMusicOnly((current) => !current)}
-                            role="switch"
-                            aria-checked={musicOnly}
-                            className={[
-                              "relative inline-flex h-6 w-11 shrink-0 items-center border transition-colors",
-                              musicOnly
-                                ? "border-[#1affe4]/40 bg-[#1affe4]/15"
-                                : "border-[#ff77c2]/40 bg-[#ff77c2]/10",
-                            ].join(" ")}
-                          >
-                            <span
-                              className={[
-                                "inline-block h-4 w-4 transform bg-current transition-transform",
-                                musicOnly ? "translate-x-6 text-[#1affe4]" : "translate-x-1 text-[#ff77c2]",
-                              ].join(" ")}
-                            />
-                          </button>
-                        </label>
+                        <div
+                          role="radiogroup"
+                          aria-label="Playlist content"
+                          className="mt-4 grid grid-cols-3 gap-px border border-[#1affe4]/14 bg-[#1affe4]/14"
+                        >
+                          {MODE_OPTIONS.map((option) => {
+                            const selected = mode === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => setMode(option.value)}
+                                className={[
+                                  "px-3 py-2.5 font-mono text-sm tracking-[0.08em] transition-colors",
+                                  selected
+                                    ? "bg-[#1affe4]/15 text-[#1affe4]"
+                                    : "bg-[#08131a]/80 text-[#91fff2]/60 hover:text-[#91fff2]",
+                                ].join(" ")}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                         <p className="mt-1.5 font-mono text-sm text-[#91fff2]/50">
-                          {musicOnly
-                            ? "Resolves songs to official music videos."
-                            : "Off: the AI can pull in regular YouTube videos, not just music videos."}
+                          {MODE_OPTIONS.find((option) => option.value === mode)?.help}
                         </p>
 
                         <div className="mt-4 flex flex-wrap gap-3">
@@ -458,6 +468,11 @@ export default function AutoGeneratePage() {
                                   <p className="min-w-0 max-w-full truncate font-retro text-lg tracking-[0.12em] text-[#ffb6dd]">
                                     {item.title || item.requested_title}
                                   </p>
+                                  {proposal?.mode === "mixed" ? (
+                                    <span className="retro-chip retro-chip--dim shrink-0">
+                                      {item.kind === "clip" ? "CLIP" : "SONG"}
+                                    </span>
+                                  ) : null}
                                   {item.resolution_source ? (
                                     <span className="retro-chip retro-chip--info shrink-0">
                                       {formatSearchSourceLabel(item.resolution_source)}

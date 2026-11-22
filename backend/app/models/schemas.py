@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text
@@ -267,9 +267,16 @@ class ChangoverClipResponse(BaseModel):
 
 class AutoGenerateProposalCreate(BaseModel):
     prompt: str = Field(..., min_length=3, max_length=1000)
-    # False = resolve candidates via a plain YouTube search (no music-category
-    # filter/suffix/ranking), letting the AI surface non-music videos.
+    # "music"  = songs only (music-category search + ranking)
+    # "videos" = plain YouTube videos, no music assumptions
+    # "mixed"  = the AI picks songs and non-music clips per slot, each resolved its own way
+    mode: Optional[Literal["music", "videos", "mixed"]] = None
+    # Deprecated: older clients send a boolean. Used only when ``mode`` is omitted.
     music: bool = True
+
+    @property
+    def effective_mode(self) -> str:
+        return self.mode or ("music" if self.music else "videos")
 
 
 class AutoGenerateProposalReplaceRequest(BaseModel):
@@ -304,6 +311,8 @@ class AutoGenerateProposalItem(BaseModel):
     resolution_source: str = ""
     reason: str = ""
     status: str = "resolved"
+    # "song" is resolved with music search/ranking, "clip" with a plain YouTube search.
+    kind: Literal["song", "clip"] = "song"
 
 
 class AutoGenerateProposalResponse(BaseModel):
@@ -312,6 +321,7 @@ class AutoGenerateProposalResponse(BaseModel):
     items: list[AutoGenerateProposalItem]
     unresolved_count: int
     expires_at: datetime
+    mode: Literal["music", "videos", "mixed"] = "music"
 
 
 class AutoGenerateApprovalResponse(BaseModel):

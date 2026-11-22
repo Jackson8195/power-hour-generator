@@ -102,9 +102,13 @@ export interface AutoGenerateProposalItem {
   resolution_source: string;
   reason: string;
   status: "resolved" | "unresolved";
+  kind: "song" | "clip";
 }
 
+export type AutoGenerateMode = "music" | "videos" | "mixed";
+
 export interface AutoGenerateProposal {
+  mode: AutoGenerateMode;
   proposal_id: string;
   normalized_prompt: string;
   items: AutoGenerateProposalItem[];
