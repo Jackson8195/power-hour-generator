@@ -39,13 +39,17 @@ Important:
 
 ## Runtime Notes
 
-This repo is being used on an older Mac.
+This repo is developed on WSL2 (Linux) and also run on an older Mac, so keep it portable.
 
 Important environment constraints:
 - Use Node 20 via `.nvmrc`
 - `scripts/start.sh` is expected to auto-use the project Node version when `nvm` is available
 - Newer Node builds may fail on this macOS version
 - Python 3.10+ is required; `python3` is the safer command to use for verification
+- GPU encoding is opt-in (`USE_NVENC=true`) and falls back to libx264 when NVENC isn't detected; never assume a GPU
+- Docker publishes the API on port 8000 to the LAN (needed for casting) and there is no auth; only run it on a trusted network
+- `librosa` is deliberately not in `requirements.txt` (conda on Mac via `start.sh`, pip in the Dockerfile)
+- `backend/.env` must use an async DB URL (`sqlite+aiosqlite:///...`); the test suite overrides env vars so it is unaffected
 
 Useful commands:
 
@@ -56,24 +60,30 @@ bash scripts/start.sh
 ```
 
 Docker notes:
-- A Docker-based local-share path now exists via [`docker-compose.yml`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/docker-compose.yml)
+- A Docker-based local-share path now exists via [`docker-compose.yml`](docker-compose.yml)
 - Docker persistence uses `backend/data/power_hour.db` plus `backend/media`
 - Docker is intended for easier sharing to a newer Mac, not as the primary verified workflow on this machine
+
+## Other Features
+
+- **Changeover clip**: one optional per-project clip (video or audio, `api/changeover.py`, `services/changeover.py`) that render interleaves between songs. It has its own storage under `backend/media/changeover`.
+- **Render library / mixtape binder**: completed renders are listed via `/api/render/library`.
+- **Casting**: only rendered files served by this app may be cast (`core/security.py`).
 
 ## Source of Truth
 
 Key files:
-- [`scripts/start.sh`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/scripts/start.sh)
-- [`backend/app/main.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/main.py)
-- [`backend/app/api/downloads.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/api/downloads.py)
-- [`backend/app/api/clips.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/api/clips.py)
-- [`backend/app/api/clip_utils.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/api/clip_utils.py)
-- [`backend/app/api/render.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/api/render.py)
-- [`backend/app/services/audio_analysis.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/services/audio_analysis.py)
-- [`backend/app/services/ffmpeg.py`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/backend/app/services/ffmpeg.py)
-- [`frontend/src/pages/ProjectPage.tsx`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/frontend/src/pages/ProjectPage.tsx)
-- [`frontend/src/utils/api.ts`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/frontend/src/utils/api.ts)
-- [`frontend/src/utils/types.ts`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/frontend/src/utils/types.ts)
+- [`scripts/start.sh`](scripts/start.sh)
+- [`backend/app/main.py`](backend/app/main.py)
+- [`backend/app/api/downloads.py`](backend/app/api/downloads.py)
+- [`backend/app/api/clips.py`](backend/app/api/clips.py)
+- [`backend/app/api/clip_utils.py`](backend/app/api/clip_utils.py)
+- [`backend/app/api/render.py`](backend/app/api/render.py)
+- [`backend/app/services/audio_analysis.py`](backend/app/services/audio_analysis.py)
+- [`backend/app/services/ffmpeg.py`](backend/app/services/ffmpeg.py)
+- [`frontend/src/pages/ProjectPage.tsx`](frontend/src/pages/ProjectPage.tsx)
+- [`frontend/src/utils/api.ts`](frontend/src/utils/api.ts)
+- [`frontend/src/utils/types.ts`](frontend/src/utils/types.ts)
 
 ## Data and Storage
 
@@ -93,6 +103,17 @@ Behavior expectations:
 - Deleting a project should clean up all of that project’s local media when possible
 
 ## Backend Guidance
+
+Invariants the tests in `backend/tests` pin down (keep them true):
+- Each clip downloads to its own file (`{youtube_id}_{clip_id}.mp4`) so clips of the same video never share or delete each other's source
+- Draft ranges are clamped to the media duration; empty ranges are rejected
+- Commit only deletes the source after ffmpeg succeeds
+- On startup, clips stuck in DOWNLOADING/ANALYZING and renders stuck in QUEUED/RENDERING are marked ERROR (`core/recovery.py`)
+- Render output filenames are slugified from the project name
+- Downloads are limited by `max_concurrent_downloads` (semaphore in `api/downloads.py`)
+- Starting a render returns `clips_included` / `clips_skipped` so the UI can warn about clips left out
+- Cancelling a render waits for the render task to unwind before deleting its DB row
+- Fire-and-forget `asyncio.create_task` calls must keep a reference (see `_spawn` in `api/changeover.py`)
 
 When changing backend behavior:
 - Keep API responses compatible with the current frontend review flow unless changing both sides together
@@ -149,14 +170,21 @@ Landing page guidance:
 - Keep menu interactions crisp and readable even when the title is animated
 
 Implementation notes:
-- Prefer shared CSS classes in [`frontend/src/styles/globals.css`](/Users/Jake/Documents/GitHub_Projects/power-hour-generator/frontend/src/styles/globals.css) for reusable retro effects
+- Prefer shared CSS classes in [`frontend/src/styles/globals.css`](frontend/src/styles/globals.css) for reusable retro effects
 - Use React state/effects only when timing needs to feel irregular or event-driven
 - Preserve readability first: effects should decorate text, not obscure it
 - If adding motion, consider reducing intensity on dense workflow screens compared with the landing screen
 
 ## Verification
 
-Preferred lightweight verification:
+Backend tests (use `uv`; system Python on WSL has no venv/pip):
+
+```bash
+uv venv .venv && uv pip install --python .venv/bin/python -r backend/requirements-dev.txt
+cd backend && ../.venv/bin/python -m pytest
+```
+
+Lightweight verification:
 
 ```bash
 python3 -m compileall backend/app
