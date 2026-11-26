@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import resolve_managed_path, unlink_managed_file
+from app.core.security import resolve_managed_path
 from app.models.schemas import (
     ClipAnalysisResponse,
     ClipCommitRequest,
@@ -24,13 +24,18 @@ from app.api.clip_utils import (
     serialize_clip,
 )
 from app.services.ffmpeg import extract_clip_segment
+from app.services.clip_media import clip_output_path, is_trimmed, release_source, trim_clip
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
 
 
+# Clips being trimmed right now. One backend process serves every device, so this in-memory set
+# is enough to stop two devices trimming the same clip at the same moment.
+_trims_in_progress: set[int] = set()
+
+
 def _clip_output_path(clip_id: int, youtube_id: str) -> Path:
-    safe_stem = youtube_id or f"clip_{clip_id}"
-    return settings.clips_dir / f"{safe_stem}_{clip_id}.mp4"
+    return clip_output_path(clip_id, youtube_id)
 
 
 def _clamp_range(clip: ClipDB, start: float, end: float) -> tuple[float, float]:
@@ -43,11 +48,6 @@ def _clamp_range(clip: ClipDB, start: float, end: float) -> tuple[float, float]:
     if end <= start:
         raise HTTPException(status_code=400, detail="end_time must be greater than start_time")
     return start, end
-
-
-def _remove_media_file(file_path: str) -> None:
-    if file_path:
-        unlink_managed_file(file_path, settings.media_dir)
 
 
 @router.post("/", response_model=ClipResponse)
@@ -158,8 +158,6 @@ async def commit_selection(
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    start_time, end_time = _clamp_range(clip, selection.start_time, selection.end_time)
-
     if not clip.file_path:
         raise HTTPException(status_code=400, detail="No source media available for this clip")
 
@@ -167,27 +165,24 @@ async def commit_selection(
     if not resolved_source or not resolved_source.exists():
         raise HTTPException(status_code=400, detail="No source media available for this clip")
 
-    source_file_path = resolved_source
-    output_path = _clip_output_path(clip.id, clip.youtube_id)
+    # Trim guard: another device (or a stale tab) may already have trimmed this clip. Its
+    # timestamps refer to the full source, and re-trimming would run ffmpeg over its own input.
+    if is_trimmed(clip.file_path) or clip.id in _trims_in_progress:
+        raise HTTPException(
+            status_code=409,
+            detail="This clip was already trimmed (maybe on another device). Refresh to see the trimmed clip.",
+        )
 
-    await extract_clip_segment(
-        source_path=str(source_file_path),
-        output_path=str(output_path),
-        start_time=start_time,
-        end_time=end_time,
-    )
+    start_time, end_time = _clamp_range(clip, selection.start_time, selection.end_time)
 
-    if source_file_path != output_path:
-        _remove_media_file(str(source_file_path))
+    _trims_in_progress.add(clip.id)
+    try:
+        # The source is released only after ffmpeg succeeds, and kept while other parts of
+        # the same compilation still use it.
+        await trim_clip(db, clip, start_time, end_time, extract=extract_clip_segment)
+    finally:
+        _trims_in_progress.discard(clip.id)
 
-    remove_clip_analysis(clip.id)
-    clip.file_path = str(output_path)
-    clip.duration = end_time - start_time
-    clip.start_time = 0.0
-    clip.end_time = clip.duration
-    clip.suggested_start = None
-
-    await db.flush()
     await db.refresh(clip)
     return serialize_clip(clip)
 
@@ -201,7 +196,8 @@ async def delete_clip(clip_id: int, db: AsyncSession = Depends(get_db)):
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    _remove_media_file(clip.file_path)
+    # Compilation parts share one source: keep it while another part still uses it.
+    await release_source(db, clip.file_path, clip.id)
     remove_clip_analysis(clip.id)
     await db.delete(clip)
     return {"status": "deleted", "clip_id": clip_id}

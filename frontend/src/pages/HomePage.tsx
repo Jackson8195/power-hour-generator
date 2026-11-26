@@ -1,116 +1,109 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, FolderOpen, Sparkles } from "lucide-react";
+import { Plus, FolderOpen, Film } from "lucide-react";
 import { createProject } from "../utils/api";
-import CrtStaticText from "../components/CrtStaticText";
+import StudioPage from "../components/StudioPage";
+import Spinner from "../components/Spinner";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim() || creating) return;
 
     setCreating(true);
+    setError("");
     try {
       const project = await createProject({ name: newName.trim() });
       navigate(`/project/${project.id}`);
     } catch (err) {
-      console.error("Failed to create project:", err);
+      setError(err instanceof Error ? err.message : "Could not create the project.");
     } finally {
       setCreating(false);
     }
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden bg-[#070b10] px-4 py-6 scanlines sm:px-6">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,43,157,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(26,255,228,0.08),transparent_30%)]" />
+    <StudioPage eyebrow="CREATE NEW" title="OPEN A FRESH SESSION">
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="retro-panel retro-panel--labeled p-6 pt-8">
+          <span className="retro-panel__label">NAME YOUR MIXTAPE</span>
+          <div className="relative z-10">
+            <form onSubmit={handleCreate} className="flex flex-col gap-4">
+              <div>
+                <label htmlFor="project-name" className="type-label mb-2 block text-phosphor-text">
+                  PROJECT NAME
+                </label>
+                <input
+                  id="project-name"
+                  type="text"
+                  className="retro-input w-full px-4 py-3 font-mono text-base"
+                  placeholder="Friday Night Power Hour"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  autoFocus
+                />
+              </div>
 
-      <section className="retro-shell relative mx-auto max-w-[1800px] px-5 py-6 sm:px-8 sm:py-8">
-        <div className="relative z-10 flex flex-col gap-8">
-          <div className="flex flex-col gap-5 border-b border-[rgba(26,255,228,0.14)] pb-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="font-retro text-sm tracking-[0.45em] text-[#1affe4]/70">
-                CREATE NEW
-              </p>
-              <CrtStaticText
-                as="h1"
-                text="OPEN A FRESH SESSION"
-                className="mt-2"
-                textClassName="font-retro text-4xl tracking-[0.22em] text-[#ff77c2] glow-text sm:text-5xl"
-              />
+              {error ? (
+                <div className="osd-notice osd-notice--error">
+                  <p className="osd-notice__title">COULD NOT CREATE</p>
+                  <p className="type-body mt-1 !text-inherit">{error}</p>
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={!newName.trim() || creating}
+                className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {creating ? <Spinner className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                <span className="crt-action__label type-label" data-text={creating ? "CREATING..." : "CREATE PROJECT"}>
+                  {creating ? "CREATING..." : "CREATE PROJECT"}
+                </span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="retro-panel retro-panel--labeled p-5 pt-7">
+            <span className="retro-panel__label">WORKS IN PROGRESS</span>
+            <div className="relative z-10">
+              <p className="type-body mb-4">Pick up a project you already started.</p>
+              <button
+                onClick={() => navigate("/works-in-progress")}
+                className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span className="crt-action__label type-label" data-text="OPEN WIP LIBRARY">
+                  OPEN WIP LIBRARY
+                </span>
+              </button>
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="retro-panel retro-panel--labeled p-6 pt-7">
-              <span className="retro-panel__label">NAME YOUR MIXTAPE</span>
-              <div className="relative z-10">
-                <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                  <div>
-                    <label className="mb-2 block font-retro text-base tracking-[0.22em] text-[#91fff2]">
-                      PROJECT NAME
-                    </label>
-                    <input
-                      type="text"
-                      className="retro-input w-full px-4 py-3 font-mono text-sm tracking-[0.12em]"
-                      placeholder="Friday Night Power Hour"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={!newName.trim() || creating}
-                    className="crt-action retro-button-primary inline-flex items-center justify-center gap-3 px-5 py-3 font-retro text-lg tracking-[0.18em] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="crt-action__label" data-text={creating ? "CREATING..." : "CREATE PROJECT"}>
-                      {creating ? "CREATING..." : "CREATE PROJECT"}
-                    </span>
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="retro-panel retro-panel--labeled p-5 pt-6">
-                <span className="retro-panel__label">WORKS IN PROGRESS</span>
-                <div className="relative z-10">
-                  <button
-                    onClick={() => navigate("/works-in-progress")}
-                    className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    <span className="crt-action__label" data-text="OPEN WIP LIBRARY">
-                      OPEN WIP LIBRARY
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="retro-panel retro-panel--labeled p-5 pt-6">
-                <span className="retro-panel__label">FINISHED OUTPUTS</span>
-                <div className="relative z-10">
-                  <button
-                    onClick={() => navigate("/power-hours")}
-                    className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3 font-retro text-base tracking-[0.16em]"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    <span className="crt-action__label" data-text="OPEN MIXTAPE PLAYER">
-                      OPEN MIXTAPE PLAYER
-                    </span>
-                  </button>
-                </div>
-              </div>
+          <div className="retro-panel retro-panel--labeled p-5 pt-7">
+            <span className="retro-panel__label">FINISHED OUTPUTS</span>
+            <div className="relative z-10">
+              <p className="type-body mb-4">Watch a power hour you already rendered.</p>
+              <button
+                onClick={() => navigate("/power-hours")}
+                className="crt-action retro-button-secondary inline-flex items-center gap-3 px-4 py-3"
+              >
+                <Film className="h-4 w-4" />
+                <span className="crt-action__label type-label" data-text="OPEN TAPE SHELF">
+                  OPEN TAPE SHELF
+                </span>
+              </button>
             </div>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </StudioPage>
   );
 }

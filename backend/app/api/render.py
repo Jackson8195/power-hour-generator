@@ -6,18 +6,20 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db, async_session
-from app.core.security import public_render_url
+from app.core.security import public_render_url, resolve_managed_path
 from app.core.storage import build_render_output_path
 from app.models.schemas import (
     ProjectDB, ClipDB, RenderDB, RenderLibraryEntry, RenderRequest, RenderProgress, RenderStatus, ClipStatus,
 )
-from app.services.ffmpeg import RenderPipeline
+from app.services.ffmpeg import RenderPipeline, extract_clip_segment
+from app.services.clip_media import finalize_project_media
 from app.services.changeover import apply_changeover_interleave
 
 logger = logging.getLogger(__name__)
@@ -109,7 +111,7 @@ async def start_render(
     clip_data = await apply_changeover_interleave(db, project_id, clip_data)
 
     # Start render in background
-    task = asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request))
+    task = asyncio.create_task(_run_render(render_id, clip_data, str(output_path), request, project_id))
     _render_tasks[render_id] = task
 
     return {
@@ -125,6 +127,7 @@ async def _run_render(
     clips: list[dict],
     output_path: str,
     request: RenderRequest,
+    project_id: int | None = None,
 ):
     """Background render task."""
     async with async_session() as db:
@@ -160,6 +163,15 @@ async def _run_render(
             render.progress = 100.0
             render.completed_at = datetime.utcnow()
             await db.commit()
+
+            if request.finalize_sources and project_id is not None:
+                # Only after a good render: a failed one leaves every source for a retry.
+                try:
+                    counts = await finalize_project_media(db, project_id, extract=extract_clip_segment)
+                    logger.info("Render %s: trimmed %s clips from their sources (%s failed)",
+                                render_id, counts["trimmed"], counts["failed"])
+                except Exception as exc:
+                    logger.error("Render %s: trimming sources after the render failed: %s", render_id, exc)
 
         except asyncio.CancelledError:
             logger.info(f"Render {render_id} cancelled.")
@@ -252,16 +264,32 @@ async def render_library(db: AsyncSession = Depends(get_db)):
     for render, project in result.all():
         if not render.output_path:
             continue
+        resolved = resolve_managed_path(render.output_path, settings.render_dir)
         entries.append(
             RenderLibraryEntry(
                 render_id=render.id,
                 project_id=project.id,
                 project_name=project.name,
                 output_url=_build_output_url(render.output_path),
+                download_url=f"/api/render/{render.id}/download",
+                size_bytes=resolved.stat().st_size if resolved and resolved.is_file() else 0,
                 completed_at=render.completed_at,
             )
         )
     return entries
+
+
+@router.get("/{render_id}/download")
+async def download_render(render_id: int, db: AsyncSession = Depends(get_db)):
+    """The finished MP4 as a file download (Content-Disposition: attachment), so a phone or
+    another computer on the Wi-Fi saves it instead of just playing it."""
+    render = await db.get(RenderDB, render_id)
+    if not render or render.status != RenderStatus.COMPLETE or not render.output_path:
+        raise HTTPException(status_code=404, detail="Tape not found")
+    resolved = resolve_managed_path(render.output_path, settings.render_dir)
+    if not resolved or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="The video file for this tape is missing")
+    return FileResponse(resolved, media_type="video/mp4", filename=resolved.name)
 
 
 @router.websocket("/ws/{render_id}")

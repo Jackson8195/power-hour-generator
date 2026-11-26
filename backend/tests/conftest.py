@@ -13,6 +13,8 @@ DB_PATH = _TMP / "test.db"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{DB_PATH}"
 os.environ["MEDIA_DIR"] = str(_TMP / "media")
 os.environ["RENDER_DIR"] = str(_TMP / "media" / "renders")
+# Never call the paid image API from tests: AI transition art falls back to bundled art.
+os.environ["OPENAI_IMAGE_MODEL"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 

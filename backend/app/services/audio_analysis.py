@@ -2,14 +2,19 @@
 
 import asyncio
 import logging
+import subprocess
+from dataclasses import dataclass
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
-async def analyze_audio(file_path: str, clip_duration: int = 60) -> dict:
+async def analyze_audio(file_path: str, clip_duration: int = 60, segment_count: int = 1) -> dict:
     """Analyze audio and produce recommendations for clip review.
+
+    ``segment_count`` > 1 additionally asks for that many non-overlapping clip ranges
+    (used by the AI flow to cut several clips from one compilation video).
 
     Returns:
         dict with keys:
@@ -20,22 +25,57 @@ async def analyze_audio(file_path: str, clip_duration: int = 60) -> dict:
             - duration: float, total duration
             - waveform: list[float], normalized bar values for preview UI
             - highlights: list[dict], recommended regions with relative scores
+            - segments: list[dict], up to ``segment_count`` non-overlapping ranges, best first
     """
     # Run CPU-intensive analysis in a thread pool
-    return await asyncio.to_thread(_analyze_sync, file_path, clip_duration)
+    return await asyncio.to_thread(_analyze_sync, file_path, clip_duration, segment_count)
 
 
-def _analyze_sync(file_path: str, clip_duration: int = 60) -> dict:
+# Sources longer than this skip the second full-length beat_track pass for BPM.
+LONG_SOURCE_SECONDS = 600
+
+
+ANALYSIS_SAMPLE_RATE = 22050
+
+
+def _load_audio(file_path: str, sr: int = ANALYSIS_SAMPLE_RATE) -> tuple[np.ndarray, int]:
+    """Mono float audio at ``sr``.
+
+    librosa first (unchanged behaviour wherever it can read the file). librosa 1.0 dropped its
+    audioread fallback, so it can no longer open MP4/M4A downloads at all; for those, decode
+    with ffmpeg (always present: the render pipeline needs it) and hand librosa the samples.
+    """
+    import librosa
+
+    try:
+        return librosa.load(file_path, sr=sr, mono=True)
+    except Exception as exc:
+        logger.info("librosa could not read %s (%s); decoding with ffmpeg", file_path, exc)
+
+    from app.core.config import settings
+
+    proc = subprocess.run(
+        [settings.ffmpeg_path, "-v", "error", "-nostdin", "-i", file_path,
+         "-vn", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        raise RuntimeError(f"ffmpeg could not decode audio: {proc.stderr.decode(errors='replace')[-300:]}")
+    return np.frombuffer(proc.stdout, dtype=np.float32).copy(), sr
+
+
+def _analyze_sync(file_path: str, clip_duration: int = 60, segment_count: int = 1) -> dict:
     """Synchronous audio analysis (runs in thread pool)."""
     import librosa
-    import soundfile as sf
 
     try:
         # Load audio (mono, 22050 Hz for analysis speed)
-        y, sr = librosa.load(file_path, sr=22050, mono=True)
+        y, sr = _load_audio(file_path)
         duration = librosa.get_duration(y=y, sr=sr)
 
         if duration <= clip_duration:
+            full = {"start": 0.0, "end": round(duration, 2), "score": 1.0}
             return {
                 "suggested_start": 0.0,
                 "suggested_end": round(duration, 2),
@@ -43,20 +83,29 @@ def _analyze_sync(file_path: str, clip_duration: int = 60) -> dict:
                 "energy": _compute_energy(y),
                 "duration": round(duration, 2),
                 "waveform": _build_waveform(y),
-                "highlights": [
-                    {
-                        "start": 0.0,
-                        "end": round(duration, 2),
-                        "score": 1.0,
-                        "label": "Full track",
-                    }
-                ],
+                "highlights": [{**full, "label": "Full track"}],
+                "segments": [full],
             }
 
-        segment_scores, music_likeness = _score_segments(y, sr, clip_duration)
+        features = _segment_features(y, sr, clip_duration)
+        music_likeness = features.music_likeness
+        rhythmic = music_likeness >= 0.5
+        # Long talk/compilation sources have many good moments: offer a few more to the reviewer.
+        highlight_count = 5 if (not rhythmic and duration >= LONG_SOURCE_SECONDS) else 3
+        segment_scores = _rank_highlights(features, highlight_count)
+        segments = (
+            _rank_non_overlapping(features, segment_count)
+            if segment_count > 1
+            else [{k: s[k] for k in ("start", "end", "score")} for s in segment_scores[:1]]
+        )
         suggested_start = segment_scores[0]["start"] if segment_scores else 0.0
-        suggested_end = min(duration, suggested_start + clip_duration)
-        bpm = _estimate_bpm(y, sr)
+        suggested_end = segment_scores[0]["end"] if segment_scores else min(duration, clip_duration)
+        if rhythmic:
+            suggested_end = min(duration, suggested_start + clip_duration)
+        if duration >= LONG_SOURCE_SECONDS:
+            bpm = _tempo_from_onsets(features.onset_env, sr, features.hop_length)
+        else:
+            bpm = _estimate_bpm(y, sr)
         energy = _compute_energy(y)
 
         return {
@@ -66,7 +115,8 @@ def _analyze_sync(file_path: str, clip_duration: int = 60) -> dict:
             "energy": round(energy, 4),
             "duration": round(duration, 2),
             "waveform": _build_waveform(y),
-            "highlights": segment_scores[:3],
+            "highlights": segment_scores,
+            "segments": segments,
             "music_likeness": round(music_likeness, 3),
         }
 
@@ -80,21 +130,48 @@ def _analyze_sync(file_path: str, clip_duration: int = 60) -> dict:
             "duration": 0.0,
             "waveform": [],
             "highlights": [],
+            "segments": [],
         }
 
 
 # Max distance a recommendation may move to land on a pause (non-rhythmic audio only).
 PAUSE_SNAP_SECONDS = 3.0
+# Max distance a non-music start may move to land on a content change (e.g. the next bit of
+# a compilation). Preferred over a plain pause: starting a clip at the top of a bit reads best.
+BOUNDARY_SNAP_SECONDS = 6.0
+# YouTube intros ("hey guys, welcome back") and end screens ("subscribe!") are poor clip
+# material in non-music videos; the activity score is damped across them.
+INTRO_SECONDS = 10.0
+OUTRO_SECONDS = 20.0
 
 
-def _score_segments(y: np.ndarray, sr: int, clip_duration: int) -> tuple[list[dict], float]:
-    """Rank recommended segments for the UI.
+@dataclass
+class _SegmentFeatures:
+    score: np.ndarray            # per-frame blended score
+    window_sums: np.ndarray      # score summed over each clip-length window, by start frame
+    music_likeness: float
+    onset_env: np.ndarray
+    snap_times: np.ndarray       # beats (rhythmic) or pauses (non-rhythmic)
+    boundary_times: np.ndarray   # content changes (non-rhythmic only; empty for songs)
+    duration: float
+    clip_duration: int
+    sr: int
+    hop_length: int
 
-    Returns ``(segments, music_likeness)``. Songs are scored on loudness + onset activity and
-    snapped to the beat. Speech, sketches, and other non-music audio have no beat to snap to
-    and "loud" is a poor proxy for "good", so they are scored on sustained activity (no dead
-    air) plus dynamic moments, and snapped to pauses so a clip doesn't start mid-word. The two
-    are blended by how rhythmic the audio is, so a misjudged clip degrades gracefully.
+    @property
+    def rhythmic(self) -> bool:
+        return self.music_likeness >= 0.5
+
+
+def _segment_features(y: np.ndarray, sr: int, clip_duration: int) -> _SegmentFeatures:
+    """Compute everything the window rankers need, once per source.
+
+    Songs are scored on loudness + onset activity and snapped to the beat. Speech, sketches,
+    and other non-music audio have no beat to snap to and "loud" is a poor proxy for "good",
+    so they are scored on sustained activity (no dead air) plus dynamic moments, damped over
+    intros/end screens, and snapped to content changes or pauses so a clip doesn't start
+    mid-word. The two are blended by how rhythmic the audio is, so a misjudged clip degrades
+    gracefully.
     """
     import librosa
 
@@ -104,52 +181,167 @@ def _score_segments(y: np.ndarray, sr: int, clip_duration: int) -> tuple[list[di
     party = _compute_party_score(y, sr, hop_length, onset_env)
     activity = _compute_activity_score(y, sr, hop_length, onset_env)
     n = min(len(party), len(activity))
+    duration = librosa.get_duration(y=y, sr=sr)
+    if music_likeness < 1.0:
+        activity = activity[:n] * _edge_weights(n, sr, hop_length, duration, clip_duration)
     score = music_likeness * party[:n] + (1.0 - music_likeness) * activity[:n]
     frames_per_clip = int(clip_duration * sr / hop_length)
-    duration = librosa.get_duration(y=y, sr=sr)
 
-    if len(score) <= frames_per_clip:
-        return [{
-            "start": 0.0,
-            "end": round(duration, 2),
-            "score": 1.0,
-            "label": "Best match",
-        }], music_likeness
+    if len(score) > frames_per_clip:
+        cumsum = np.concatenate(([0.0], np.cumsum(score)))
+        window_sums = cumsum[frames_per_clip:] - cumsum[:-frames_per_clip]
+    else:
+        window_sums = np.array([])
 
-    cumsum = np.concatenate(([0.0], np.cumsum(score)))
-    window_sums = cumsum[frames_per_clip:] - cumsum[:-frames_per_clip]
-    max_score = float(window_sums.max() + 1e-8)
-
-    rhythmic = music_likeness >= 0.5
-    if rhythmic:
+    boundary_times = np.array([])
+    if music_likeness >= 0.5:
         _, beats = librosa.beat.beat_track(y=y, sr=sr, hop_length=hop_length)
         snap_times = librosa.frames_to_time(beats, sr=sr, hop_length=hop_length)
     else:
         snap_times = _find_pauses(y, sr, hop_length)
-    snap_limit = None if rhythmic else PAUSE_SNAP_SECONDS
+        boundary_times = _find_content_boundaries(y, sr, hop_length)
 
-    ranked_segments = []
-    min_gap = max(clip_duration * 0.5, 15)
-    for best_frame in np.argsort(window_sums)[::-1]:
-        candidate_time = float(librosa.frames_to_time(best_frame, sr=sr, hop_length=hop_length))
-        candidate_time = _snap_to_nearest(candidate_time, snap_times, snap_limit)
-        candidate_time = min(candidate_time, max(0.0, duration - clip_duration))
-        if any(abs(candidate_time - segment["start"]) < min_gap for segment in ranked_segments):
+    return _SegmentFeatures(
+        score=score, window_sums=window_sums, music_likeness=music_likeness,
+        onset_env=onset_env, snap_times=snap_times, boundary_times=boundary_times,
+        duration=duration, clip_duration=clip_duration, sr=sr, hop_length=hop_length,
+    )
+
+
+def _score_segments(y: np.ndarray, sr: int, clip_duration: int) -> tuple[list[dict], float]:
+    """Top-3 recommended segments for the UI and the music likeness (kept for callers/tests)."""
+    features = _segment_features(y, sr, clip_duration)
+    return _rank_highlights(features, 3), features.music_likeness
+
+
+def _place_window(f: _SegmentFeatures, frame: int) -> tuple[float, float]:
+    """Snap a raw window start to a good cut point and choose its end."""
+    import librosa
+
+    start = float(librosa.frames_to_time(frame, sr=f.sr, hop_length=f.hop_length))
+    if f.rhythmic:
+        start = _snap_to_nearest(start, f.snap_times, None)
+    else:
+        snapped = _snap_to_nearest(start, f.boundary_times, BOUNDARY_SNAP_SECONDS)
+        if snapped == start:
+            snapped = _snap_to_nearest(start, f.snap_times, PAUSE_SNAP_SECONDS)
+        start = snapped
+    start = min(start, max(0.0, f.duration - f.clip_duration))
+    end = min(f.duration, start + f.clip_duration)
+    if not f.rhythmic:
+        end = _snap_to_nearest(end, f.snap_times, PAUSE_SNAP_SECONDS)
+        end = min(f.duration, max(end, start + f.clip_duration * 0.5))
+    return start, end
+
+
+def _whole_source(f: _SegmentFeatures) -> list[dict]:
+    return [{"start": 0.0, "end": round(f.duration, 2), "score": 1.0, "label": "Best match"}]
+
+
+def _rank_highlights(f: _SegmentFeatures, count: int) -> list[dict]:
+    """Best ``count`` windows for the review UI; they may overlap by up to half a clip."""
+    if len(f.window_sums) == 0:
+        return _whole_source(f)
+    max_score = float(f.window_sums.max() + 1e-8)
+    ranked: list[dict] = []
+    min_gap = max(f.clip_duration * 0.5, 15)
+    for best_frame in np.argsort(f.window_sums)[::-1]:
+        start, end = _place_window(f, int(best_frame))
+        if any(abs(start - segment["start"]) < min_gap for segment in ranked):
             continue
-        end_time = min(duration, candidate_time + clip_duration)
-        if not rhythmic:
-            end_time = _snap_to_nearest(end_time, snap_times, snap_limit)
-            end_time = min(duration, max(end_time, candidate_time + clip_duration * 0.5))
-        ranked_segments.append({
-            "start": round(candidate_time, 2),
-            "end": round(end_time, 2),
-            "score": round(float(window_sums[best_frame] / max_score), 4),
-            "label": _segment_label(len(ranked_segments)),
+        ranked.append({
+            "start": round(start, 2),
+            "end": round(end, 2),
+            "score": round(float(f.window_sums[best_frame] / max_score), 4),
+            "label": _segment_label(len(ranked)),
         })
-        if len(ranked_segments) == 3:
+        if len(ranked) == count:
             break
+    return ranked
 
-    return ranked_segments, music_likeness
+
+def _rank_non_overlapping(f: _SegmentFeatures, count: int) -> list[dict]:
+    """Up to ``count`` windows that never overlap, best first (several clips from one source)."""
+    if len(f.window_sums) == 0:
+        return [{k: v for k, v in s.items() if k != "label"} for s in _whole_source(f)]
+    max_score = float(f.window_sums.max() + 1e-8)
+    chosen: list[dict] = []
+    frames_per_sec = f.sr / f.hop_length
+    # Snapping can move a window by a few seconds, so reject raw starts near a chosen window
+    # cheaply before snapping (keeps this fast on hour-long sources).
+    margin = BOUNDARY_SNAP_SECONDS + PAUSE_SNAP_SECONDS
+    for best_frame in np.argsort(f.window_sums)[::-1]:
+        raw = best_frame / frames_per_sec
+        if any(s["start"] - f.clip_duration - margin < raw < s["end"] + margin for s in chosen):
+            continue
+        start, end = _place_window(f, int(best_frame))
+        if any(start < s["end"] + 1.0 and s["start"] < end + 1.0 for s in chosen):
+            continue
+        chosen.append({
+            "start": round(start, 2),
+            "end": round(end, 2),
+            "score": round(float(f.window_sums[best_frame] / max_score), 4),
+        })
+        if len(chosen) == count:
+            break
+    return chosen
+
+
+def _edge_weights(
+    n: int, sr: int, hop_length: int, duration: float, clip_duration: int
+) -> np.ndarray:
+    """Per-frame weight < 1 over the intro and end screen of a video long enough to skip them."""
+    weights = np.ones(n)
+    if duration < clip_duration + INTRO_SECONDS + OUTRO_SECONDS:
+        return weights
+    times = np.arange(n) * hop_length / sr
+    intro = np.clip(times / INTRO_SECONDS, 0.0, 1.0)
+    outro = np.clip((duration - times) / OUTRO_SECONDS, 0.0, 1.0)
+    return weights * (0.35 + 0.65 * np.minimum(intro, outro))
+
+
+def _find_content_boundaries(y: np.ndarray, sr: int, hop_length: int) -> np.ndarray:
+    """Times (s) where the sound changes character: a new bit, scene, or speaker.
+
+    Compares the average timbre (MFCCs, energy term dropped) of the ~2s before and after each
+    half-second step and keeps the strong local peaks. In compilations these line up with cuts
+    between clips, which are the most natural places to start one.
+    """
+    import librosa
+
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, hop_length=hop_length)[1:]
+    if mfcc.shape[1] == 0:
+        return np.array([])
+    mfcc = (mfcc - mfcc.mean(axis=1, keepdims=True)) / (mfcc.std(axis=1, keepdims=True) + 1e-8)
+    block = max(int(0.5 * sr / hop_length), 1)
+    n_blocks = mfcc.shape[1] // block
+    side = 4  # blocks on each side (~2s)
+    if n_blocks < 2 * side + 1:
+        return np.array([])
+    blocks = mfcc[:, : n_blocks * block].reshape(mfcc.shape[0], n_blocks, block).mean(axis=2).T
+    cumsum = np.concatenate((np.zeros((1, blocks.shape[1])), np.cumsum(blocks, axis=0)))
+    idx = np.arange(side, n_blocks - side + 1)
+    before = (cumsum[idx] - cumsum[idx - side]) / side
+    after = (cumsum[idx + side] - cumsum[idx]) / side
+    novelty = np.linalg.norm(after - before, axis=1)
+    threshold = max(float(np.percentile(novelty, 90)), 1.5 * float(np.median(novelty)))
+    peaks = [
+        int(idx[i])
+        for i in range(len(novelty))
+        if novelty[i] >= threshold and novelty[i] == novelty[max(0, i - side): i + side + 1].max()
+    ]
+    return np.array(peaks, dtype=float) * block * hop_length / sr
+
+
+def _tempo_from_onsets(onset_env: np.ndarray, sr: int, hop_length: int) -> float:
+    """Cheap BPM estimate from an existing onset envelope (for long sources)."""
+    import librosa
+
+    try:
+        tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr, hop_length=hop_length)
+    except AttributeError:  # librosa < 0.10
+        tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sr, hop_length=hop_length)
+    return float(np.atleast_1d(tempo)[0])
 
 
 def _music_likeness(onset_env: np.ndarray, sr: int, hop_length: int) -> float:

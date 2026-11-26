@@ -7,10 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.schemas import ChangoverClipDB
+from app.models.schemas import ChangoverClipDB, RenderRequest
 from app.services.ffmpeg import build_default_shot_card
+from app.services.transition_fx import CARD_SECONDS, DEFAULT_SOUND, build_art_card, card_length, pick_bundled_art
 
 logger = logging.getLogger(__name__)
+
+
+def render_resolution() -> str:
+    """The resolution renders use by default. Transitions are built at this size so they
+    always match the render (the render pipeline still scales every clip as a safety net)."""
+    return RenderRequest.model_fields["resolution"].default
 
 
 async def apply_changeover_interleave(
@@ -60,10 +67,10 @@ async def apply_changeover_interleave(
 
 
 async def ensure_default_changeover(
-    db: AsyncSession, project_id: int, duration: float = 4.0, resolution: str = "1280x720"
+    db: AsyncSession, project_id: int, duration: float = CARD_SECONDS, resolution: str | None = None
 ) -> None:
-    """Guarantee the project has a transition clip by building the default 3·2·1 →
-    "SHOT!" card when none is configured.
+    """Guarantee the project has a transition clip by building the default animated card
+    (corner 3·2·1 countdown, then "SHOT!" on the default drink cue) when none is configured.
 
     Non-destructive: if a changeover row already exists (e.g. a custom one the user
     built), it is left untouched — the interleave uses it only when it is "ready".
@@ -75,8 +82,19 @@ async def ensure_default_changeover(
         return
 
     output_path = str(settings.changeover_dir / f"project_{project_id}_changeover.mp4")
+    duration = card_length(duration)
+    art = pick_bundled_art(project_id)
     try:
-        await build_default_shot_card(output_path, duration=duration, resolution=resolution)
+        if art:
+            # Bundled drink art (shot glass, beer, ...) with the corner countdown and default cue.
+            await build_art_card(
+                output_path, str(art), duration=duration,
+                resolution=resolution or render_resolution(), hit_text="SHOT!", sound=DEFAULT_SOUND,
+            )
+        else:
+            await build_default_shot_card(
+                output_path, duration=duration, resolution=resolution or render_resolution()
+            )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Failed to build default changeover for project %s: %s", project_id, exc)
         return

@@ -31,8 +31,32 @@ fi
 args=("$@")
 [ ${#args[@]} -eq 0 ] && args=(up --build -d)
 
+# This machine's address on the local network, for opening the app on a phone.
+lan_ip() {
+    if command -v powershell.exe >/dev/null 2>&1; then
+        # Windows (Git Bash or WSL): Docker Desktop publishes ports on the Windows host, so ask Windows.
+        powershell.exe -NoProfile -Command \
+            "(Get-NetIPConfiguration | Where-Object { \$_.IPv4DefaultGateway } | Select-Object -First 1).IPv4Address.IPAddress" \
+            2>/dev/null | tr -d '\r'
+    elif command -v ipconfig >/dev/null 2>&1 && [ "$(uname)" = "Darwin" ]; then
+        ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null
+    else
+        hostname -I 2>/dev/null | awk '{print $1}'
+    fi
+}
+
+ip="$(lan_ip || true)"
+# Cast devices fetch the video from this address (a page opened at localhost cannot hand them "localhost").
+export PH_LAN_HOST="${PH_LAN_HOST:-$ip}"
+
 if [ "$dry_run" = "1" ]; then
     echo "docker compose ${files[*]} ${args[*]}"
 else
-    exec docker compose "${files[@]}" "${args[@]}"
+    docker compose "${files[@]}" "${args[@]}"
+    if [ "${args[0]}" = "up" ]; then
+        echo ""
+        echo "Power Hour Studio is up:"
+        echo "  This computer:          http://localhost:5173"
+        echo "  Phone (same Wi-Fi):     http://${ip:-YOUR-PC-IP}:5173"
+    fi
 fi

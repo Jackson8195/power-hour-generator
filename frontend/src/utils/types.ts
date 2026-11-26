@@ -63,6 +63,9 @@ export interface RenderLibraryEntry {
   project_id: number;
   project_name: string;
   output_url: string;
+  /** The same file served as an attachment, so other devices save it. */
+  download_url: string;
+  size_bytes: number;
   completed_at: string | null;
 }
 
@@ -103,6 +106,13 @@ export interface AutoGenerateProposalItem {
   reason: string;
   status: "resolved" | "unresolved";
   kind: "song" | "clip";
+  // Slots sharing a youtube_id are different parts cut from one compilation video.
+  segment_index?: number;
+  segment_count?: number;
+  /** Locked slots are never touched by REVISE or REPLACE. */
+  locked?: boolean;
+  /** Swapped in by the latest REVISE (shown as NEW). */
+  revised?: boolean;
 }
 
 export type AutoGenerateMode = "music" | "videos" | "mixed";
@@ -114,6 +124,10 @@ export interface AutoGenerateProposal {
   items: AutoGenerateProposalItem[];
   unresolved_count: number;
   expires_at: string;
+  /** Every REVISE comment so far; they steer later swaps too. */
+  notes?: string[];
+  /** The list from before the latest REVISE can still be restored. */
+  can_undo?: boolean;
 }
 
 export interface AutoGenerateApproval {
@@ -130,7 +144,8 @@ export interface AutoGenerateProject {
 export interface AutoGenerateJobProgress {
   job_id: string;
   project_id: number;
-  phase: "queued" | "processing" | "rendering" | "complete" | "error";
+  /** "review": every clip has the AI's pick saved; the user checks them and renders. */
+  phase: "queued" | "processing" | "review" | "rendering" | "complete" | "error";
   progress: number;
   total_clips: number;
   processed_clips: number;
@@ -150,6 +165,10 @@ export interface AutoGenerateProposalJobStart {
 
 export interface AutoGenerateReplaceJobStart {
   replace_job_id: string;
+}
+
+export interface AutoGenerateReviseJobStart {
+  revise_job_id: string;
 }
 
 export interface AutoGenerateProposalJobStatus {
@@ -181,4 +200,30 @@ export interface ChangoverClip {
   error_message: string;
   preview_url: string;
   raw_video_url: string;
+}
+
+/** The AI generator's in-progress draft, shared by every device through the backend. */
+export interface AiSessionState {
+  prompt: string;
+  mode: AutoGenerateMode;
+  project_name: string;
+  proposal_id: string;
+  proposal_job_id: string;
+  transition_mode: "default" | "ai" | "custom";
+  ai_transition_count: number;
+  ai_transition_sources: "cards" | "youtube" | "both";
+  transition_project_id: number | null;
+  transition_prompt: string;
+  /** The call word for AI transitions ("" = no text). */
+  drink_text: string;
+  /** A REVISE running on the playlist (either device follows it). */
+  revise_job_id: string;
+}
+
+export interface AiSession {
+  session: AiSessionState;
+  version: number;
+  updated_at: string;
+  proposal: AutoGenerateProposal | null;
+  active_job: AutoGenerateJobProgress | null;
 }

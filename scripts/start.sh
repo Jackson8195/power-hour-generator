@@ -138,7 +138,12 @@ if ! conda env list | grep -q "^${CONDA_ENV_NAME} "; then
     conda create -n "$CONDA_ENV_NAME" python=3.12 -y
     conda activate "$CONDA_ENV_NAME"
     echo -e "${CYAN}Installing librosa via conda (avoids llvmlite build issues)...${NC}"
-    conda install librosa -c conda-forge -y
+    # Same version as Docker and the tests. An older macOS with no build of it falls back to
+    # the newest one conda-forge has (analysis decodes MP4 with ffmpeg either way).
+    if ! conda install "librosa=1.0.1" -c conda-forge -y; then
+        echo -e "${YELLOW}librosa 1.0.1 isn't available for this Mac; installing the newest compatible version${NC}"
+        conda install librosa -c conda-forge -y
+    fi
 else
     conda activate "$CONDA_ENV_NAME"
 fi

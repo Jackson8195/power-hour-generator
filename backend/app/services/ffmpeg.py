@@ -204,144 +204,65 @@ async def build_changeover_clip(
     return str(output)
 
 
-def _card_font_size(text: str, width: int, height: int, max_ratio: float) -> int:
-    """Largest font size (<= max_ratio of frame height) that keeps ``text`` inside ~90% of the width."""
-    fit = int((width * 0.9) / (0.6 * max(len(text), 1)))
-    return max(24, min(int(height * max_ratio), fit))
-
-
 async def build_text_card(
     output_path: str,
-    countdown: list[str],
     headline: str,
     subline: str = "",
-    text_color: str = "#FFFF00",
+    text_color: str = "#FFE600",
     bg_color: str = "#000000",
-    duration: float = 4.0,
+    duration: float = 5.5,
     resolution: str = "1280x720",
-) -> str:
-    """Build a generated transition card: optional countdown words (1s each), then a headline.
+    hit_text: str = "DRINK!",
+    sound: str = "can",
+) -> float:
+    """Build an animated transition card and return its exact length in seconds.
+
+    Timeline: a small 3·2·1 countdown ticks in the top-right corner while the headline
+    slides in (subline fades in under it), then at 3s a flash + screen shake + punch-zoomed
+    ``hit_text`` lands on the recorded drink cue. See ``transition_fx``.
 
     All text goes to ffmpeg through files with ``expansion=none`` rather than into the filter
     string, so AI-written text can never break or inject into the filter graph. Colors must be
     ``#RRGGBB`` (callers validate).
     """
-    import tempfile
+    from app.services.transition_fx import build_animated_card
 
-    w, h = map(int, resolution.split("x"))
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fg = "0x" + text_color.lstrip("#")
-    bg = "0x" + bg_color.lstrip("#")
-    headline_start = float(len(countdown))
-    duration = max(duration, headline_start + 1.5)
-
-    with tempfile.TemporaryDirectory(prefix="ph_card_") as tmp:
-        tmp_dir = Path(tmp)
-
-        def text_file(name: str, content: str) -> str:
-            path = tmp_dir / name
-            path.write_text(content, encoding="utf-8")
-            return str(path)
-
-        def draw(file_path: str, size: int, y: str, enable: str) -> str:
-            # file paths are ours (tempdir) so they contain no filter metacharacters
-            return (
-                f"drawtext=textfile={file_path}:expansion=none:fontsize={size}:fontcolor={fg}:"
-                f"borderw=6:bordercolor=black:x=(w-text_w)/2:y={y}:enable='{enable}'"
-            )
-
-        draws = []
-        for idx, word in enumerate(countdown):
-            f = text_file(f"count_{idx}.txt", word)
-            size = _card_font_size(word, w, h, 0.45)
-            draws.append(draw(f, size, "(h-text_h)/2", f"between(t,{idx},{idx + 1})"))
-
-        head_size = _card_font_size(headline, w, h, 0.3)
-        head_y = "(h-text_h)/2" if not subline else "(h-text_h)/2-h*0.06"
-        draws.append(draw(text_file("headline.txt", headline), head_size, head_y, f"gte(t,{headline_start})"))
-        if subline:
-            sub_size = _card_font_size(subline, w, h, 0.09)
-            draws.append(
-                draw(text_file("subline.txt", subline), sub_size, f"(h/2)+h*0.14", f"gte(t,{headline_start})")
-            )
-
-        cmd = [
-            settings.ffmpeg_path, "-y",
-            "-f", "lavfi", "-i", f"color=c={bg}:s={w}x{h}:r=30",
-            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-            "-t", str(duration),
-            "-vf", ",".join(draws),
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
-            "-r", "30", "-movflags", "+faststart",
-            "-shortest",
-            str(output),
-        ]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        _, stderr = await proc.communicate()
-
-    if proc.returncode != 0:
-        logger.error(f"FFmpeg text card build failed: {stderr.decode()[-500:]}")
-        raise RuntimeError(f"Failed to build text card: {stderr.decode()[-200:]}")
-    return str(output)
+    return await build_animated_card(
+        output_path,
+        headline=headline,
+        subline=subline,
+        text_color=text_color,
+        bg_color=bg_color,
+        duration=duration,
+        resolution=resolution,
+        hit_text=hit_text,
+        sound=sound,
+    )
 
 
 async def build_default_shot_card(
     output_path: str,
-    duration: float = 4.0,
+    duration: float = 5.5,
     resolution: str = "1280x720",
 ) -> str:
-    """Build the default transition card: a black screen with a 3·2·1 countdown
-    followed by a bold "SHOT!" flash.
+    """Build the default transition card: the animated card with a corner 3·2·1
+    countdown under "GET READY", then a "SHOT!" hit on the default drink cue.
 
     Used as the automatic transition between songs when the user did not configure
     a custom changeover clip.
     """
-    w, h = map(int, resolution.split("x"))
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    # Countdown 3, 2, 1 over the first three seconds, then "SHOT!" for the remainder.
-    draws = []
-    for idx, num in enumerate((3, 2, 1)):
-        draws.append(
-            f"drawtext=text='{num}':fontsize=240:fontcolor=white:borderw=6:bordercolor=black:"
-            f"x=(w-text_w)/2:y=(h-text_h)/2:enable='between(t,{idx},{idx + 1})'"
-        )
-    draws.append(
-        f"drawtext=text='SHOT!':fontsize=200:fontcolor=yellow:borderw=6:bordercolor=black:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2:enable='gte(t,3)'"
+    await build_text_card(
+        output_path,
+        headline="GET READY",
+        subline="",
+        text_color="#FFE600",
+        bg_color="#000000",
+        duration=duration,
+        resolution=resolution,
+        hit_text="SHOT!",
+        sound="can",
     )
-    vf = ",".join(draws)
-
-    cmd = [
-        settings.ffmpeg_path, "-y",
-        "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30",
-        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-        "-t", str(duration),
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
-        "-r", "30", "-movflags", "+faststart",
-        "-shortest",
-        str(output),
-    ]
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-
-    if proc.returncode != 0:
-        logger.error(f"FFmpeg default shot card build failed: {stderr.decode()[-500:]}")
-        raise RuntimeError(f"Failed to build default shot card: {stderr.decode()[-200:]}")
-
-    return str(output)
+    return str(output_path)
 
 
 async def extract_clip_segment(
@@ -374,6 +295,28 @@ async def extract_clip_segment(
         label=f"extract clip from {source_path}",
     )
     return str(output)
+
+
+# A very quick "breath" at every clip edge (songs, video clips and transitions), so a song
+# doesn't slam into the countdown card mid-note: dip to black and fade the sound. Fades eat
+# into each clip's own edges, so no time is added and the hour keeps its exact timing.
+EDGE_FADE_IN_VIDEO = 0.15
+EDGE_FADE_IN_AUDIO = 0.2
+EDGE_FADE_OUT_VIDEO = 0.25
+EDGE_FADE_OUT_AUDIO = 0.4
+
+
+def edge_fades(duration: float) -> tuple[str, str]:
+    """``(video, audio)`` filter suffixes fading a clip of ``duration`` seconds in and out.
+    Very short clips get proportionally shorter fades so they never overlap."""
+    scale = min(1.0, max(0.0, duration) / 2.0)
+    vin, vout = EDGE_FADE_IN_VIDEO * scale, EDGE_FADE_OUT_VIDEO * scale
+    ain, aout = EDGE_FADE_IN_AUDIO * scale, EDGE_FADE_OUT_AUDIO * scale
+    if duration <= 0 or scale == 0:
+        return "", ""
+    video = f"fade=t=in:st=0:d={vin:.3f},fade=t=out:st={max(0.0, duration - vout):.3f}:d={vout:.3f}"
+    audio = f"afade=t=in:st=0:d={ain:.3f},afade=t=out:st={max(0.0, duration - aout):.3f}:d={aout:.3f}"
+    return video, audio
 
 
 class RenderPipeline:
@@ -482,6 +425,11 @@ class RenderPipeline:
             countdown_filter = self._build_countdown_filter(duration)
             if countdown_filter:
                 vf = vf + "," + countdown_filter
+        # Last, so the countdown overlay dips to black with the picture.
+        fade_v, fade_a = edge_fades(duration)
+        if fade_v:
+            vf = vf + "," + fade_v
+            af_filter = af_filter + "," + fade_a
 
         def build_cmd(encoder_args: list[str]) -> list[str]:
             return [

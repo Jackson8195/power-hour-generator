@@ -5,6 +5,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json /app/frontend/
 RUN npm install
 
+COPY VERSION /app/VERSION
 COPY frontend /app/frontend
 RUN npm run build
 

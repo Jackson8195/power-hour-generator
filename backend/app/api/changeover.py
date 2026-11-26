@@ -5,13 +5,23 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session, get_db
 from app.models.schemas import ChangoverClipDB, ChangoverClipResponse
+from app.services.changeover import render_resolution
 from app.services.ffmpeg import build_changeover_clip
+from app.services.transition_fx import (
+    DEFAULT_SOUND,
+    HIT_WORDS,
+    available_sounds,
+    build_clip_with_stinger,
+    bundled_art,
+    pick_bundled_art,
+)
 from app.services.youtube import download_video, download_audio_only
 
 logger = logging.getLogger(__name__)
@@ -70,6 +80,61 @@ def _to_response(row: ChangoverClipDB) -> ChangoverClipResponse:
     )
 
 
+def _wrap_options(countdown: object, drink_ending: object, drink_art: object, drink_word: object) -> dict:
+    """Validate the builder's wrap options against fixed lists (nothing free-form reaches ffmpeg)."""
+    sound = str(drink_ending or "").strip().lower()
+    art_names = {p.name: p for p in bundled_art()}
+    word = str(drink_word or "").strip().upper()
+    return {
+        "countdown": str(countdown).strip().lower() not in ("false", "0", "no", "off"),
+        "sound": sound if sound in available_sounds() else "",
+        "art": art_names.get(str(drink_art or "")),
+        "word": word if word in HIT_WORDS else "DRINK!",
+    }
+
+
+async def _apply_wrap(output_path: str, options: dict, project_id: int) -> float | None:
+    """Add the corner countdown and/or the DRINK! art ending to a built manual transition.
+    Returns the new length, or None when nothing was added."""
+    if not options["countdown"] and not options["sound"]:
+        return None
+    art = None
+    if options["sound"]:
+        art = options["art"] or pick_bundled_art(project_id)
+    wrapped = str(Path(output_path).with_name(Path(output_path).stem + "_wrapped.mp4"))
+    length = await build_clip_with_stinger(
+        wrapped,
+        output_path,
+        start=0.0,
+        clip_seconds=None,
+        resolution=render_resolution(),
+        countdown=options["countdown"],
+        art_path=str(art) if art else None,
+        hit_text=options["word"],
+        sound=options["sound"] or DEFAULT_SOUND,
+    )
+    Path(wrapped).replace(output_path)
+    return length
+
+
+@router.get("/assets/catalog")
+async def transition_assets():
+    """What the builder can add to a transition: bundled drink art, cue sounds, call words."""
+    return {
+        "art": [{"name": p.name, "url": f"/api/changeover/assets/art/{p.name}"} for p in bundled_art()],
+        "sounds": list(available_sounds()),
+        "words": list(HIT_WORDS),
+    }
+
+
+@router.get("/assets/art/{name}")
+async def transition_art(name: str):
+    for path in bundled_art():
+        if path.name == name:
+            return FileResponse(path)
+    raise HTTPException(status_code=404, detail="Unknown art")
+
+
 def delete_changeover_media_files(project_id: int) -> None:
     """Delete all changeover media files for a project. Also used by project deletion."""
     changeover_dir = settings.changeover_dir
@@ -107,8 +172,13 @@ async def build_image_audio_changeover(
     image: UploadFile | None = None,
     audio: UploadFile | None = None,
     duration: float = Form(3.0),
+    countdown: str = Form("true"),
+    drink_ending: str = Form(""),
+    drink_art: str = Form(""),
+    drink_word: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
+    wrap = _wrap_options(countdown, drink_ending, drink_art, drink_word)
     if not image and not audio:
         raise HTTPException(status_code=422, detail="At least one of image or audio is required")
     if not (1.0 <= duration <= 10.0):
@@ -185,10 +255,13 @@ async def build_image_audio_changeover(
         await build_changeover_clip(
             output_path=output_path,
             duration=duration,
-            resolution="1280x720",
+            resolution=render_resolution(),
             image_path=image_path or None,
             audio_path=audio_path or None,
         )
+        wrapped_length = await _apply_wrap(output_path, wrap, project_id)
+        if wrapped_length:
+            row.duration = wrapped_length
         row.output_path = output_path
         row.status = "ready"
     except Exception as e:
@@ -432,6 +505,10 @@ async def build_video_changeover(
     trim_end = float(body.get("trim_end", 0.0))
     audio_trim_start = float(body.get("audio_trim_start", 0.0))
     duration = float(body.get("duration", 0.0))
+    wrap = _wrap_options(
+        body.get("countdown", True), body.get("drink_ending", ""),
+        body.get("drink_art", ""), body.get("drink_word", ""),
+    )
 
     result = await db.execute(
         select(ChangoverClipDB).where(
@@ -459,15 +536,16 @@ async def build_video_changeover(
             await build_changeover_clip(
                 output_path=output_path,
                 duration=clip_duration,
-                resolution="1280x720",
+                resolution=render_resolution(),
                 image_path=row.image_path or None,
                 audio_path=row.raw_video_path,
                 audio_trim_start=audio_trim_start,
             )
+            wrapped_length = await _apply_wrap(output_path, wrap, project_id)
             row.output_path = output_path
             row.trim_start = audio_trim_start
             row.trim_end = audio_trim_start + clip_duration
-            row.duration = clip_duration
+            row.duration = wrapped_length or clip_duration
             row.status = "ready"
             row.error_message = ""
         except Exception as e:
@@ -484,15 +562,16 @@ async def build_video_changeover(
             await build_changeover_clip(
                 output_path=output_path,
                 duration=clip_duration,
-                resolution="1280x720",
+                resolution=render_resolution(),
                 video_path=row.raw_video_path,
                 trim_start=trim_start,
                 trim_end=trim_end,
             )
+            wrapped_length = await _apply_wrap(output_path, wrap, project_id)
             row.output_path = output_path
             row.trim_start = trim_start
             row.trim_end = trim_end
-            row.duration = clip_duration
+            row.duration = wrapped_length or clip_duration
             row.status = "ready"
             row.error_message = ""
         except Exception as e:

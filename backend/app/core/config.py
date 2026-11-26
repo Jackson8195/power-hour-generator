@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     spotify_client_secret: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
+    # Model that reviews resolved YouTube results against the prompt (rejects off-topic videos).
+    # Blank = use openai_model. It's one short call per batch, so a stronger model is cheap here.
+    openai_review_model: str = ""
+    # AI transition art (blank model = always use the bundled drink art). quality: low|medium|high.
+    openai_image_model: str = "gpt-image-2"
+    openai_image_quality: str = "medium"
+    # ElevenLabs (sound effects for transition cues). Blank = not used.
+    elevenlabs_api_key: str = ""
 
     # Paths
     media_dir: Path = Path("./media")
@@ -23,6 +31,9 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     frontend_port: int = 5173
     cors_origins: str = "http://localhost:5173"
+    # This machine's LAN address (set by scripts/docker-up), so a page opened at localhost can
+    # still give out tape links that another device on the Wi-Fi can open.
+    lan_host: str = ""
 
     # FFmpeg
     ffmpeg_path: str = "ffmpeg"

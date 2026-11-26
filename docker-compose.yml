@@ -8,6 +8,8 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: sqlite+aiosqlite:///./data/power_hour.db
+      # This PC's LAN IP, filled in by scripts/docker-up (Cast devices fetch videos from it).
+      LAN_HOST: ${PH_LAN_HOST:-}
     ports:
       - "8000:8000"
     volumes:

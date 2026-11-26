@@ -64,7 +64,7 @@ async def search_youtube(
             )
             results = await _search_with_ytdlp(query, fetch_limit, music=music)
     else:
-        results = await _search_with_ytdlp(query, fetch_limit)
+        results = await _search_with_ytdlp(query, fetch_limit, music=music)
 
     ranked = _rank_search_results(query, results, preferred_artists=preferred_artists or [], music=music)
     return ranked[:max_results]
@@ -108,6 +108,65 @@ async def recommend_for_project(clips: list[ClipDB], max_results: int = 12) -> l
                 return recommendations
 
     return recommendations[:max_results]
+
+
+_VIDEO_ID_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?(?:[^#\s]*&)?v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_-]{11})"
+)
+
+
+def parse_youtube_id(text: str) -> str:
+    """The video id from a YouTube link anywhere in ``text`` ('' when there is none)."""
+    match = _VIDEO_ID_RE.search(text or "")
+    return match.group(1) if match else ""
+
+
+async def lookup_video(youtube_id: str) -> Optional[SearchResult]:
+    """Title, channel, thumbnail and length of one video by id (Data API, else yt-dlp)."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", youtube_id or ""):
+        return None
+    if settings.youtube_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(YOUTUBE_VIDEOS_URL, params={
+                    "part": "snippet,contentDetails",
+                    "id": youtube_id,
+                    "key": settings.youtube_api_key,
+                })
+                resp.raise_for_status()
+                items = resp.json().get("items", [])
+            if items:
+                item = items[0]
+                thumbs = item["snippet"]["thumbnails"]
+                return SearchResult(
+                    youtube_id=youtube_id,
+                    title=html.unescape(item["snippet"]["title"]),
+                    artist=html.unescape(item["snippet"]["channelTitle"]),
+                    thumbnail=thumbs.get("high", thumbs.get("default", {})).get("url", ""),
+                    duration=_parse_iso_duration(item["contentDetails"]["duration"]),
+                    search_source="youtube_api",
+                )
+        except Exception as exc:
+            logger.warning("Video lookup via the Data API failed for %s: %s", youtube_id, exc)
+    proc = await asyncio.create_subprocess_exec(
+        "yt-dlp", "--dump-json", "--no-download", "--no-playlist",
+        f"https://www.youtube.com/watch?v={youtube_id}",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    try:
+        data = json.loads(stdout.decode().strip().splitlines()[0])
+    except (IndexError, json.JSONDecodeError):
+        return None
+    return SearchResult(
+        youtube_id=youtube_id,
+        title=html.unescape(data.get("title", "Unknown")),
+        artist=html.unescape(data.get("channel", data.get("uploader", ""))),
+        thumbnail=data.get("thumbnail", ""),
+        duration=_seconds_to_timestamp(data.get("duration", 0)),
+        search_source="yt_dlp",
+    )
 
 
 async def _search_with_api(query: str, max_results: int, music: bool = True) -> list[SearchResult]:
@@ -295,7 +354,11 @@ async def download_video(
     cmd = [
         "yt-dlp",
         url,
-        "-f", f"bestvideo[height<={quality}]+bestaudio/best[height<={quality}]",
+        # Prefer H.264 + AAC: the review preview plays the source file directly, and iPhones
+        # (Safari) often can't play YouTube's VP9/AV1 streams. Falls back to the best of any codec.
+        "-f",
+        f"bestvideo[height<={quality}][vcodec^=avc1]+bestaudio[ext=m4a]"
+        f"/bestvideo[height<={quality}]+bestaudio/best[height<={quality}]",
         "--merge-output-format", "mp4",
         "-o", output_template,
         "--print-json",

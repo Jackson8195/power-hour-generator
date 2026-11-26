@@ -30,9 +30,22 @@ if (Test-NvidiaGpu) {
 
 if (-not $ComposeArgs -or $ComposeArgs.Count -eq 0) { $ComposeArgs = @("up", "--build", "-d") }
 
+# This machine's address on the local network: for opening the app on a phone, and handed to
+# the backend so Cast devices (which fetch the video themselves) never get "localhost".
+$ip = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | Select-Object -First 1).IPv4Address.IPAddress
+if (-not $env:PH_LAN_HOST -and $ip) { $env:PH_LAN_HOST = $ip }
+
 if ($DryRun) {
     Write-Host ("docker compose " + ($files -join " ") + " " + ($ComposeArgs -join " "))
 } else {
     & docker compose @files @ComposeArgs
-    exit $LASTEXITCODE
+    $code = $LASTEXITCODE
+    if ($code -eq 0 -and $ComposeArgs[0] -eq "up") {
+        if (-not $ip) { $ip = "<this computer's IP>" }
+        Write-Host ""
+        Write-Host "Power Hour Studio is up:"
+        Write-Host "  This computer:          http://localhost:5173"
+        Write-Host "  Phone (same Wi-Fi):     http://${ip}:5173"
+    }
+    exit $code
 }

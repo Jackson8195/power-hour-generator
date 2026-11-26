@@ -187,6 +187,9 @@ class RenderRequest(BaseModel):
     resolution: str = "1280x720"
     transition_type: str = "crossfade"
     include_countdown: bool = True
+    # After a successful render, trim every clip still on its full source to its saved range
+    # and delete the sources (the AI build's review flow). Off: sources are left as they are.
+    finalize_sources: bool = False
 
 
 class RenderProgress(BaseModel):
@@ -203,6 +206,9 @@ class RenderLibraryEntry(BaseModel):
     project_id: int
     project_name: str
     output_url: str
+    # Same file, served as an attachment so other devices save it.
+    download_url: str = ""
+    size_bytes: int = 0
     completed_at: Optional[datetime] = None
 
 
@@ -249,6 +255,7 @@ class ChangoverClipDB(Base):
     duration      = Column(Float, default=3.0)
     trim_start    = Column(Float, default=0.0)
     trim_end      = Column(Float, default=0.0)
+    style         = Column(Text, default="")  # AI rows: JSON {text_color, hit_text, sound} for re-trims
     status        = Column(String(50), default="pending")  # pending | downloading | downloaded | ready | error
     error_message = Column(Text, default="")
     created_at    = Column(DateTime, default=datetime.utcnow)
@@ -293,6 +300,19 @@ class AutoGenerateProposalCreate(BaseModel):
 
 class AutoGenerateProposalReplaceRequest(BaseModel):
     slot_index: int = Field(..., ge=0, lt=60)
+    # Optional steer for this one slot: a comment ("something funnier"), an exact
+    # "Artist - Title", or a YouTube link (used as-is).
+    note: str = Field(default="", max_length=300)
+
+
+class AutoGenerateProposalReviseRequest(BaseModel):
+    """A general comment on the whole playlist; only the slots it calls for are swapped."""
+    comment: str = Field(..., min_length=3, max_length=1000)
+
+
+class AutoGenerateProposalLockRequest(BaseModel):
+    slot_index: int = Field(..., ge=0, lt=60)
+    locked: bool
 
 
 class AutoGenerateProposalApproveRequest(BaseModel):
@@ -307,8 +327,44 @@ class AutoGenerateProposalApproveRequest(BaseModel):
     # Let the AI create its own transition clips (instead of the default card) and cycle
     # through them between songs. 0 = off. Ignored if a custom transition already exists.
     ai_transition_count: int = Field(default=0, ge=0, le=8)
-    # "cards" = generated text cards, "youtube" = found clips, "both" = a mix.
+    # "cards" = drink-art cards, "youtube" = found clips, "both" = a mix.
     ai_transition_sources: Literal["cards", "youtube", "both"] = "both"
+    # The user already generated and reviewed the AI transitions in the pre-created project
+    # (/api/ai-transitions): keep them instead of generating new ones during the build.
+    ai_transitions_reviewed: bool = False
+    # The user's direction for AI transitions generated during the build.
+    ai_transition_prompt: str = Field(default="", max_length=1000)
+    # The user's call word for AI transitions generated during the build (None: the AI picks).
+    ai_transition_text: Optional[str] = Field(default=None, max_length=48)
+
+
+class AiSessionState(BaseModel):
+    """The AI generator's in-progress draft, kept on the server so another device (e.g. the
+    phone) can pick it up mid-way. One per app: this is a single-user local tool."""
+
+    prompt: str = Field(default="", max_length=PROMPT_MAX_LENGTH)
+    mode: Literal["music", "videos", "mixed"] = "music"
+    project_name: str = Field(default="", max_length=255)
+    proposal_id: str = Field(default="", max_length=64)
+    # A playlist being generated right now (any device can keep polling it).
+    proposal_job_id: str = Field(default="", max_length=64)
+    transition_mode: Literal["default", "ai", "custom"] = "default"
+    ai_transition_count: int = Field(default=4, ge=1, le=8)
+    ai_transition_sources: Literal["cards", "youtube", "both"] = "both"
+    transition_project_id: Optional[int] = None
+    transition_prompt: str = Field(default="", max_length=1000)
+    drink_text: str = Field(default="DRINK!", max_length=48)
+    # A REVISE running on the playlist (either device shows it and picks up the result).
+    revise_job_id: str = Field(default="", max_length=64)
+
+
+class AiSessionResponse(BaseModel):
+    session: AiSessionState
+    # Bumped on every write so a device can tell its copy is stale.
+    version: int
+    updated_at: datetime
+    proposal: Optional["AutoGenerateProposalResponse"] = None
+    active_job: Optional["AutoGenerateJobProgressResponse"] = None
 
 
 class AutoGenerateProjectResponse(BaseModel):
@@ -330,6 +386,15 @@ class AutoGenerateProposalItem(BaseModel):
     status: str = "resolved"
     # "song" is resolved with music search/ranking, "clip" with a plain YouTube search.
     kind: Literal["song", "clip"] = "song"
+    # Slots that share a youtube_id are cut from one (compilation) video: segment_index is this
+    # slot's part (0-based) and segment_count how many slots use that video. Recomputed by the
+    # backend whenever the proposal changes; 0 / 1 for an ordinary single-clip slot.
+    segment_index: int = 0
+    segment_count: int = 1
+    # Locked slots are never touched by REVISE or REPLACE.
+    locked: bool = False
+    # Swapped in by the latest REVISE (shown as NEW until the next one).
+    revised: bool = False
 
 
 class AutoGenerateProposalResponse(BaseModel):
@@ -339,6 +404,10 @@ class AutoGenerateProposalResponse(BaseModel):
     unresolved_count: int
     expires_at: datetime
     mode: Literal["music", "videos", "mixed"] = "music"
+    # Every REVISE comment so far; they also steer later swaps.
+    notes: list[str] = []
+    # True while the list from before the latest REVISE can still be restored.
+    can_undo: bool = False
 
 
 class AutoGenerateApprovalResponse(BaseModel):
@@ -378,3 +447,11 @@ class AutoGenerateProposalJobStatusResponse(BaseModel):
 
 class AutoGenerateReplaceJobStartResponse(BaseModel):
     replace_job_id: str
+
+
+class AutoGenerateReviseJobStartResponse(BaseModel):
+    revise_job_id: str
+
+
+# AiSessionResponse refers to response models declared after it.
+AiSessionResponse.model_rebuild()

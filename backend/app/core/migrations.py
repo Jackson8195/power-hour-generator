@@ -47,3 +47,18 @@ def migrate_changeover_table(conn: Connection) -> None:
         f"SELECT {cols}, 'manual', 0, '' FROM {legacy}"
     ))
     conn.execute(text(f"DROP TABLE {legacy}"))
+
+
+# Columns added to existing tables after release: (table, column, SQL type + default).
+ADDED_COLUMNS = [
+    (CHANGEOVER_TABLE, "style", "TEXT DEFAULT ''"),
+]
+
+
+def add_missing_columns(conn: Connection) -> None:
+    """ADD COLUMN for new nullable columns on tables that already exist (idempotent)."""
+    for table, column, ddl in ADDED_COLUMNS:
+        columns = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
+        if columns and column not in columns:
+            logger.info("Adding column %s.%s", table, column)
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))

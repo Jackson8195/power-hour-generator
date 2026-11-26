@@ -16,31 +16,11 @@
 
 @layer base {
   body {
-    @apply bg-zinc-950 text-zinc-100 antialiased;
+    @apply bg-crt-bg font-mono text-zinc-100 antialiased;
   }
 }
 
 @layer components {
-  /* CD binder sleeve pocket */
-  .cd-sleeve {
-    background: rgba(160, 180, 220, 0.07);
-    border: 1px solid rgba(200, 220, 255, 0.15);
-    border-radius: 6px;
-    padding: 10px;
-    position: relative;
-  }
-  .cd-sleeve::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.06);
-    border-bottom: 1px solid rgba(200, 220, 255, 0.12);
-    border-radius: 6px 6px 0 0;
-  }
-
   .scanlines::before {
     content: '';
     position: fixed;
@@ -521,247 +501,660 @@
     );
   }
 
-  .mixtape-walkman {
-    background:
-      radial-gradient(circle at top, rgba(255, 43, 157, 0.08), transparent 38%),
-      linear-gradient(180deg, rgba(7, 17, 24, 0.98), rgba(3, 8, 12, 1));
+  /* ---------- Type scale ----------
+     VT323 is a pixel face with a tiny x-height: keep it at 18px+ and modest tracking.
+     Space Mono carries body copy and data. */
+  .type-display {
+    font-family: "VT323", "Space Mono", monospace;
+    letter-spacing: 0.12em;
+    line-height: 1;
   }
 
-  .mixtape-walkman__body {
-    position: relative;
-    width: min(100%, 620px);
-    aspect-ratio: 1.28 / 1;
-    border-radius: 2.4rem;
-    border: 1px solid rgba(145, 255, 242, 0.14);
-    background:
-      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 40%),
-      linear-gradient(145deg, rgba(82, 92, 104, 0.96), rgba(34, 41, 49, 0.98) 45%, rgba(17, 22, 29, 1));
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-      inset 0 -18px 30px rgba(0, 0, 0, 0.34),
-      0 18px 40px rgba(0, 0, 0, 0.38);
-    padding: 1.6rem;
-  }
-
-  .mixtape-walkman__body--modal {
-    max-width: 680px;
-  }
-
-  .mixtape-walkman__masthead {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding: 0 0.2rem;
-    font-family: monospace;
-    font-size: 0.72rem;
+  .type-eyebrow {
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.15rem;
     letter-spacing: 0.22em;
-    color: rgba(230, 240, 248, 0.72);
+    text-transform: uppercase;
+    color: rgba(145, 255, 242, 0.85);
+  }
+
+  .type-label {
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.2rem;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
-  .mixtape-walkman__screen {
-    border-radius: 1.4rem;
-    border: 1px solid rgba(26, 255, 228, 0.12);
-    background:
-      linear-gradient(180deg, rgba(7, 28, 32, 0.98), rgba(3, 14, 17, 0.96));
-    min-height: 38%;
-    padding: 1.25rem;
-    box-shadow: inset 0 0 18px rgba(26, 255, 228, 0.04);
-    margin: 0 5rem 1rem;
+  .type-body {
+    font-family: "Space Mono", monospace;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: rgba(145, 255, 242, 0.85);
   }
 
-  .mixtape-walkman__deck {
-    position: relative;
-    margin-top: 0.6rem;
-    height: 42%;
-    border-radius: 1.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background:
-      linear-gradient(180deg, rgba(12, 19, 27, 0.98), rgba(3, 7, 11, 1));
+  .type-data {
+    font-family: "Space Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Buttons ---------- */
+  .retro-button-primary,
+  .retro-button-secondary,
+  .retro-button-danger,
+  .retro-button-warn,
+  .retro-button-ghost {
+    transition:
+      color 0.12s,
+      border-color 0.12s,
+      box-shadow 0.12s,
+      transform 0.08s;
+  }
+
+  .retro-button-primary:active:not(:disabled),
+  .retro-button-secondary:active:not(:disabled),
+  .retro-button-danger:active:not(:disabled),
+  .retro-button-warn:active:not(:disabled),
+  .retro-button-ghost:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.55);
+  }
+
+  .retro-button-danger {
+    border-radius: var(--bezel);
+    border: 1px solid rgba(255, 110, 110, 0.4);
+    background: linear-gradient(180deg, rgba(60, 10, 14, 0.95), rgba(30, 6, 9, 0.98));
+    color: #ff9a9a;
+  }
+
+  .retro-button-danger:hover:not(:disabled) {
+    color: #ffd0d0;
+    border-color: rgba(255, 128, 128, 0.65);
+    box-shadow: 0 0 22px rgba(255, 90, 90, 0.18);
+  }
+
+  /* Destructive-but-intended actions (trim and discard source). */
+  .retro-button-warn {
+    border-radius: var(--bezel);
+    border: 1px solid rgba(255, 209, 102, 0.45);
+    background: linear-gradient(180deg, rgba(58, 40, 6, 0.95), rgba(30, 20, 4, 0.98));
+    color: #ffd166;
+  }
+
+  .retro-button-warn:hover:not(:disabled) {
+    color: #ffeab0;
+    border-color: rgba(255, 220, 130, 0.7);
+    box-shadow: 0 0 22px rgba(255, 209, 102, 0.18);
+  }
+
+  .retro-button-ghost {
+    border-radius: var(--bezel);
+    border: 1px solid transparent;
+    color: rgba(145, 255, 242, 0.8);
+  }
+
+  .retro-button-ghost:hover:not(:disabled) {
+    color: #defffb;
+    border-color: rgba(26, 255, 228, 0.25);
+    background: rgba(26, 255, 228, 0.05);
+  }
+
+  .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--bezel);
+    border: 1px solid rgba(26, 255, 228, 0.16);
+    padding: 0.45rem;
+    color: rgba(145, 255, 242, 0.75);
+    transition: color 0.12s, border-color 0.12s, background-color 0.12s;
+  }
+
+  .icon-button:hover:not(:disabled) {
+    color: #defffb;
+    border-color: rgba(26, 255, 228, 0.4);
+  }
+
+  .icon-button--danger:hover:not(:disabled) {
+    color: #ffb0b0;
+    border-color: rgba(255, 110, 110, 0.5);
+    background: rgba(255, 60, 60, 0.08);
+  }
+
+  /* ---------- Segmented control ---------- */
+  .segmented {
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    gap: 1px;
+    border: 1px solid rgba(26, 255, 228, 0.2);
+    background: rgba(26, 255, 228, 0.2);
+    border-radius: var(--bezel);
     overflow: hidden;
   }
 
-  .mixtape-walkman__deck--modal {
+  .segmented__option {
+    padding: 0.5rem 0.75rem;
+    background: rgba(8, 19, 26, 0.95);
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.15rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(145, 255, 242, 0.7);
+    transition: color 0.12s, background-color 0.12s;
+  }
+
+  .segmented__option:hover:not(:disabled) {
+    color: #defffb;
+  }
+
+  .segmented__option[aria-checked="true"] {
+    background: rgba(26, 255, 228, 0.16);
+    color: #defffb;
+    text-shadow: 0 0 8px rgba(26, 255, 228, 0.5);
+  }
+
+  .segmented__option--pink[aria-checked="true"] {
+    background: rgba(255, 43, 157, 0.2);
+    color: #ffd7eb;
+    text-shadow: 0 0 8px rgba(255, 43, 157, 0.5);
+  }
+
+  /* ---------- Studio nav bar ---------- */
+  .studio-nav {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    border-bottom: 1px solid rgba(26, 255, 228, 0.14);
+    background: rgba(5, 10, 15, 0.88);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 3px 0 rgba(26, 255, 228, 0.04);
+  }
+
+  .studio-nav__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    border-radius: var(--bezel);
+    padding: 0.35rem 0.6rem;
+    color: #ff9bd2;
+    transition: text-shadow 0.15s, background-color 0.15s;
+  }
+
+  .studio-nav__home:hover,
+  .studio-nav__home:focus-visible {
+    background: rgba(255, 43, 157, 0.08);
+    text-shadow: 0 0 10px rgba(255, 43, 157, 0.7);
+  }
+
+  .studio-nav__crumbs {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.2rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(145, 255, 242, 0.7);
+  }
+
+  .studio-nav__crumbs a:hover {
+    color: #defffb;
+  }
+
+  .studio-nav__crumb--current {
+    color: #ffb6dd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- OSD dialog / notices ---------- */
+  .osd-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.78);
+    animation: osd-fade 0.12s ease-out;
+  }
+
+  .osd-dialog {
+    position: relative;
+    width: min(100%, 30rem);
+    border: 1px solid rgba(26, 255, 228, 0.35);
+    background: linear-gradient(180deg, rgba(4, 30, 64, 0.97), rgba(2, 14, 34, 0.98));
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-      inset 0 12px 30px rgba(255, 255, 255, 0.03);
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 40px rgba(26, 255, 228, 0.12),
+      0 24px 60px rgba(0, 0, 0, 0.6);
+    padding: 1.5rem;
+    animation: osd-open 0.22s steps(4, end);
   }
 
-  .mixtape-walkman__slot {
+  .osd-dialog--danger {
+    border-color: rgba(255, 128, 128, 0.45);
+  }
+
+  .osd-dialog__title {
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 2rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #defffb;
+    text-shadow: 0 0 10px rgba(26, 255, 228, 0.55);
+  }
+
+  .osd-dialog--danger .osd-dialog__title {
+    color: #ffd0d0;
+    text-shadow: 0 0 10px rgba(255, 90, 90, 0.55);
+  }
+
+  .osd-notice {
+    position: relative;
+    border: 1px solid;
+    border-radius: var(--bezel);
+    padding: 0.9rem 1.1rem;
+    animation: osd-open 0.22s steps(4, end);
+  }
+
+  .osd-notice--error {
+    border-color: rgba(255, 110, 110, 0.4);
+    background: rgba(255, 60, 60, 0.08);
+    color: #ffc4c4;
+  }
+
+  .osd-notice--warn {
+    border-color: rgba(255, 209, 102, 0.4);
+    background: rgba(255, 209, 102, 0.07);
+    color: #ffe8a8;
+  }
+
+  .osd-notice--ok {
+    border-color: rgba(74, 255, 150, 0.4);
+    background: rgba(74, 255, 150, 0.07);
+    color: #c8ffe0;
+  }
+
+  .osd-notice__title {
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.35rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Loaders and meters ---------- */
+  /* VU-style loader: three bars bouncing out of phase. */
+  .vu-loader {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 1em;
+    width: 1em;
+    color: currentColor;
+  }
+
+  .vu-loader span {
+    flex: 1;
+    height: 30%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+    animation: vu-bounce 0.9s steps(5, end) infinite;
+  }
+
+  .vu-loader span:nth-child(2) {
+    animation-delay: -0.3s;
+  }
+
+  .vu-loader span:nth-child(3) {
+    animation-delay: -0.6s;
+  }
+
+  /* VCR "tracking" bar: a bright band rolling down a dark strip. */
+  .tracking-loader {
+    position: relative;
+    height: 0.5rem;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid rgba(26, 255, 228, 0.16);
+    background: rgba(8, 20, 28, 0.95);
+  }
+
+  .tracking-loader::after {
+    content: '';
     position: absolute;
-    top: 1rem;
-    left: 50%;
-    width: 52%;
-    height: 0.4rem;
-    transform: translateX(-50%);
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.95);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.04),
-      0 0 0 1px rgba(255, 255, 255, 0.03);
+    inset: 0 auto 0 0;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(26, 255, 228, 0.75), rgba(255, 43, 157, 0.6), transparent);
+    animation: tracking-roll 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
 
-  .mixtape-walkman__window {
+  .ring-progress {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .ring-progress svg {
+    transform: rotate(-90deg);
+  }
+
+  .ring-progress__track {
+    fill: none;
+    stroke: rgba(26, 255, 228, 0.1);
+  }
+
+  /* Dashed so the ring reads as metered segments, like the bar meter. */
+  .ring-progress__bar {
+    fill: none;
+    stroke: url(#ring-gradient);
+    stroke-linecap: butt;
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    filter: drop-shadow(0 0 6px rgba(26, 255, 228, 0.45));
+  }
+
+  .ring-progress__ticks {
+    fill: none;
+    stroke: #050a0f;
+  }
+
+  .ring-progress__value {
     position: absolute;
-    inset: 1.9rem 1.5rem 1rem;
-    border-radius: 1.4rem;
-    border: 1px solid rgba(145, 255, 242, 0.08);
-    background:
-      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 36%),
-      linear-gradient(180deg, rgba(24, 40, 50, 0.5), rgba(8, 18, 25, 0.16));
-    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.28);
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: "VT323", "Space Mono", monospace;
+    color: #defffb;
+    text-shadow: 0 0 12px rgba(26, 255, 228, 0.55);
   }
 
-  .mixtape-walkman__disc {
+  .rec-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.2rem;
+    letter-spacing: 0.18em;
+    color: #ff8080;
+  }
+
+  .rec-light::before {
+    content: '';
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 9999px;
+    background: #ff4545;
+    box-shadow: 0 0 8px rgba(255, 69, 69, 0.85);
+    animation: rec-blink 1.2s steps(1, end) infinite;
+  }
+
+  /* ---------- Screen transitions ---------- */
+  /* Route change: a quick vertical roll with a flash of static, like changing channel. */
+  .channel-change {
+    animation: channel-roll 0.24s steps(3, end);
+  }
+
+  /* CRT power-on: a bright horizontal line opens into the picture. */
+  .crt-power-on {
+    animation: crt-power-on 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    transform-origin: center;
+  }
+
+  .crt-power-on--fast {
+    animation-duration: 0.4s;
+  }
+
+  /* Landing menu cursor: slides between items instead of blinking on. */
+  .menu-cursor {
     position: absolute;
-    left: 50%;
-    top: -34%;
-    width: 52%;
-    aspect-ratio: 1 / 1;
-    border-radius: 999px;
-    transform: translateX(-50%) translateY(-120%);
-    opacity: 0;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.1),
-      0 12px 26px rgba(0, 0, 0, 0.35);
-  }
-
-  .mixtape-walkman__disc--visible {
-    opacity: 1;
-    transform: translateX(-50%) translateY(26%);
-  }
-
-  .mixtape-walkman__disc--dropping {
-    animation: walkman-disc-drop 1.2s cubic-bezier(0.18, 0.78, 0.25, 1) forwards;
-    opacity: 1;
-  }
-
-  .mixtape-walkman__disc--spinup {
-    animation:
-      walkman-disc-drop 1.2s cubic-bezier(0.18, 0.78, 0.25, 1) forwards,
-      walkman-disc-spinup 1.2s linear 1.2s forwards;
-    opacity: 1;
-  }
-
-  .mixtape-walkman__disc--spinning {
-    transform: translateX(-50%) translateY(26%);
-    opacity: 1;
-    animation: walkman-disc-spin 2.4s linear infinite;
-  }
-
-  .mixtape-walkman__disc-hole {
-    position: absolute;
-    inset: 46%;
-    border-radius: 999px;
-    background: #05070b;
-  }
-
-  .mixtape-walkman__disc-label {
-    position: absolute;
-    left: 12%;
-    right: 12%;
-    text-align: center;
-    font-family: "Permanent Marker", cursive;
-    font-size: clamp(0.84rem, 2.4vw, 1.4rem);
-    line-height: 1.1;
-    color: rgba(17, 17, 17, 0.92);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+    left: 0;
+    right: 0;
+    top: 0;
+    border-left: 3px solid #ff2b9d;
+    background: rgba(255, 43, 157, 0.15);
+    box-shadow: inset 12px 0 18px -12px rgba(255, 43, 157, 0.6);
+    transition:
+      transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.12s;
     pointer-events: none;
   }
 
-  .mixtape-walkman__disc-label--top {
-    top: 8%;
-    transform: rotate(-4deg);
-  }
-
-  .mixtape-walkman__disc-label--bottom {
-    bottom: 8%;
-    transform: rotate(3deg);
-  }
-
-  .mixtape-walkman__speaker {
+  /* ---------- Waveform playhead ---------- */
+  .waveform-playhead {
     position: absolute;
-    top: 4.5rem;
-    bottom: 4.8rem;
-    width: 3rem;
-    border-radius: 1.1rem;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    margin-left: -1px;
+    background: #defffb;
+    box-shadow: 0 0 8px rgba(222, 255, 251, 0.9), 0 0 16px rgba(26, 255, 228, 0.6);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ---------- VHS tape shelf ---------- */
+  .vhs-shelf {
+    position: relative;
+    border-radius: var(--bezel);
+    border: 1px solid rgba(26, 255, 228, 0.14);
     background:
-      radial-gradient(circle, rgba(255, 255, 255, 0.14) 0 10%, transparent 11% 100%),
-      radial-gradient(circle, rgba(255, 255, 255, 0.1) 0 8%, transparent 9% 100%),
-      linear-gradient(180deg, rgba(20, 24, 30, 0.95), rgba(10, 14, 18, 1));
-    background-size: 0.7rem 0.7rem, 1rem 1rem, 100% 100%;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-      inset 0 0 16px rgba(0, 0, 0, 0.3);
+      linear-gradient(180deg, rgba(12, 22, 30, 0.96), rgba(6, 12, 18, 0.98));
+    padding: 1rem 1rem 0;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55);
   }
 
-  .mixtape-walkman__speaker--left {
-    left: 1.2rem;
+  /* Shelf board under each row of tapes. */
+  .vhs-shelf__board {
+    height: 0.7rem;
+    margin: 0 -1rem;
+    background: linear-gradient(180deg, #1d2a33, #0b1218);
+    border-top: 1px solid rgba(26, 255, 228, 0.22);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
   }
 
-  .mixtape-walkman__speaker--right {
-    right: 1.2rem;
-  }
-
-  .mixtape-walkman__controls {
+  .vhs-shelf__row {
     display: flex;
-    justify-content: center;
-    gap: 0.9rem;
-    margin-top: 1rem;
+    align-items: flex-end;
+    gap: 0.5rem;
+    min-height: 18.5rem;
+    padding: 0 0.25rem;
   }
 
-  .mixtape-walkman__controls span {
-    width: 3.5rem;
-    height: 0.65rem;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(30, 36, 42, 0.95));
+  /* A tape standing on the shelf, spine out. */
+  .vhs-tape {
+    position: relative;
+    flex: 0 0 3.6rem;
+    height: 17.5rem;
+    border-radius: 3px 3px 0 0;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.4)),
+      linear-gradient(180deg, #17171c, #0c0c10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    transition:
+      transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.22s;
+  }
+
+  .vhs-tape:hover {
+    transform: translateY(-6px);
+  }
+
+  .vhs-tape--selected {
+    transform: translateY(-16px);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-      0 1px 2px rgba(0, 0, 0, 0.25);
+      0 0 0 1px rgba(26, 255, 228, 0.55),
+      0 0 24px rgba(26, 255, 228, 0.25);
+  }
+
+  .vhs-tape--selected:hover {
+    transform: translateY(-16px);
+  }
+
+  /* Paper label running up the spine. */
+  .vhs-tape__label {
+    position: absolute;
+    inset: 0.9rem 0.45rem 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #f3eedf, #e4dcc6);
+    border-top: 4px solid var(--tape-color, #ff2b9d);
+    overflow: hidden;
+  }
+
+  .vhs-tape__title {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    max-height: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre-line;
+    text-align: center;
+    font-family: "Permanent Marker", cursive;
+    font-size: 1.05rem;
+    line-height: 1.05;
+    color: #16161a;
+  }
+
+  .vhs-tape__num {
+    position: absolute;
+    bottom: 0.7rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    color: rgba(230, 240, 248, 0.6);
+  }
+
+  /* Tape cover card shown for the selected tape. */
+  .vhs-cover {
+    position: relative;
+    aspect-ratio: 0.58 / 1;
+    width: 100%;
+    max-width: 15rem;
+    border-radius: 3px;
+    padding: 1rem;
+    background:
+      linear-gradient(160deg, var(--tape-color, #ff2b9d) 0%, transparent 55%),
+      linear-gradient(180deg, #121218, #08080b);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+  }
+
+  .vhs-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -55deg,
+      transparent 0 18px,
+      rgba(255, 255, 255, 0.03) 18px 20px
+    );
+    pointer-events: none;
+  }
+
+  /* VCR deck the tape slides into before playback. */
+  .vcr {
+    position: relative;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, #1a1d22, #0d0f12);
+    padding: 0.9rem 1.1rem;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  }
+
+  .vcr__slot {
+    position: relative;
+    height: 1.4rem;
+    border-radius: 2px;
+    background: #020304;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.9);
+    overflow: hidden;
+  }
+
+  .vcr__display {
+    font-family: "VT323", "Space Mono", monospace;
+    font-size: 1.35rem;
+    letter-spacing: 0.14em;
+    color: #4dff91;
+    text-shadow: 0 0 8px rgba(77, 255, 145, 0.7);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vhs-inserting {
+    animation: vhs-insert 0.45s cubic-bezier(0.5, 0, 0.75, 0) forwards;
   }
 }
 
-@keyframes walkman-disc-drop {
-  0% {
-    transform: translateX(-50%) translateY(-140%) scale(0.98);
-  }
-  55% {
-    transform: translateX(-50%) translateY(24%) scale(1);
-  }
-  72% {
-    transform: translateX(-50%) translateY(18%) scale(1);
-  }
-  100% {
-    transform: translateX(-50%) translateY(26%) scale(1);
-  }
-}
-
-@keyframes walkman-disc-spin {
-  from {
-    transform: translateX(-50%) translateY(26%) rotate(0deg);
-  }
-  to {
-    transform: translateX(-50%) translateY(26%) rotate(360deg);
-  }
-}
-
-@keyframes walkman-disc-spinup {
-  from {
-    transform: translateX(-50%) translateY(26%) rotate(0deg);
-  }
-  to {
-    transform: translateX(-50%) translateY(26%) rotate(300deg);
-  }
-}
 
 @layer utilities {
+  /* Two tight layers instead of three wide ones: still glows, keeps letter edges sharp. */
   .glow-text {
     text-shadow:
-      0 0 8px currentColor,
-      0 0 20px currentColor,
-      0 0 40px currentColor;
+      0 0 6px currentColor,
+      0 0 18px color-mix(in srgb, currentColor 55%, transparent);
   }
+}
+
+/* Keyboard focus: always visible, on theme. */
+:where(a, button, input, select, textarea, [role="button"], [role="radio"], [role="switch"]):focus-visible {
+  outline: 2px solid rgba(26, 255, 228, 0.85);
+  outline-offset: 2px;
+}
+
+@keyframes osd-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes osd-open {
+  0% { opacity: 0; transform: scaleY(0.04); }
+  50% { opacity: 1; transform: scaleY(0.6); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes vu-bounce {
+  0%, 100% { height: 25%; }
+  40% { height: 100%; }
+  70% { height: 55%; }
+}
+
+@keyframes tracking-roll {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(380%); }
+}
+
+@keyframes rec-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.15; }
+}
+
+@keyframes channel-roll {
+  0% { opacity: 0.35; transform: translateY(-1.5%); filter: brightness(1.6) contrast(1.2); }
+  50% { opacity: 0.8; transform: translateY(0.8%); filter: brightness(1.2); }
+  100% { opacity: 1; transform: translateY(0); filter: none; }
+}
+
+@keyframes crt-power-on {
+  0% { transform: scale(1, 0.004); filter: brightness(4); opacity: 1; }
+  35% { transform: scale(1, 0.004); filter: brightness(3); }
+  70% { transform: scale(1, 1.02); filter: brightness(1.6); }
+  100% { transform: scale(1, 1); filter: brightness(1); }
+}
+
+@keyframes vhs-insert {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(70%); opacity: 0; }
 }
 
 @keyframes title-idle-flicker {
@@ -980,8 +1373,109 @@
     opacity: 0.65;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .gpu-active-indicator__light {
+/* ---------- Phone and touch ---------- */
+.studio-nav {
+  padding-top: env(safe-area-inset-top);
+}
+
+.mobile-tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 65;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid rgba(26, 255, 228, 0.18);
+  background: rgba(5, 10, 15, 0.95);
+  backdrop-filter: blur(10px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-tabbar__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 3.5rem;
+  font-family: "VT323", "Space Mono", monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: rgba(145, 255, 242, 0.7);
+}
+
+.mobile-tabbar__tab--active {
+  color: #ff77c2;
+  text-shadow: 0 0 8px rgba(255, 43, 157, 0.6);
+  box-shadow: inset 0 2px 0 #ff2b9d;
+}
+
+/* Fingers, not cursors: 44px targets, and 16px inputs so iOS doesn't zoom on focus. */
+@media (pointer: coarse) {
+  .retro-button-primary,
+  .retro-button-secondary,
+  .retro-button-danger,
+  .retro-button-warn,
+  .retro-button-ghost,
+  .segmented__option {
+    min-height: 44px;
+  }
+
+  .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .retro-input,
+  select.retro-input,
+  textarea.retro-input {
+    font-size: 16px;
+  }
+}
+
+/* No hover on touch screens: a tap must not leave a CRT flicker "stuck" on a button. */
+@media (hover: none) {
+  .crt-action:hover .crt-action__label,
+  .crt-action:hover .crt-action__label::before,
+  .crt-action:hover .crt-action__label::after {
     animation: none;
+  }
+
+  .vhs-tape:hover {
+    transform: none;
+  }
+
+  .vhs-tape--selected:hover {
+    transform: translateY(-16px);
+  }
+}
+
+/* Reduced motion: keep the look (glow, scanlines) but stop flicker, sweeps, rolls and pulses. */
+@media (prefers-reduced-motion: reduce) {
+  .gpu-active-indicator__light,
+  .crt-title__text,
+  .crt-title__text::before,
+  .crt-title__text::after,
+  .crt-action:hover .crt-action__label,
+  .crt-action:hover .crt-action__label::before,
+  .crt-action:hover .crt-action__label::after,
+  .crt-action:focus-visible .crt-action__label,
+  .crt-action:focus-visible .crt-action__label::before,
+  .crt-action:focus-visible .crt-action__label::after,
+  .channel-change,
+  .crt-power-on,
+  .osd-dialog,
+  .osd-notice,
+  .osd-backdrop,
+  .rec-light::before,
+  .vhs-inserting,
+  .tracking-loader::after,
+  .vu-loader span {
+    animation: none !important;
+  }
+
+  .menu-cursor,
+  .vhs-tape,
+  .ring-progress__bar {
+    transition: none !important;
   }
 }

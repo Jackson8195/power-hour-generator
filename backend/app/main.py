@@ -10,12 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.core.version import APP_VERSION
 from app.core.database import init_db
 from app.core.recovery import recover_interrupted_jobs
 from app.core.storage import migrate_storage_layout
-from app.api import search, downloads, clips, projects, render, cast, auto_generate, changeover
+from app.api import search, downloads, clips, projects, render, cast, auto_generate, changeover, ai_transitions
 
 logging.basicConfig(level=logging.INFO)
+# HTTP client request lines include full URLs, and YouTube Data API URLs carry the API key.
+for _name in ("httpx", "httpx2", "httpcore"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +43,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Power Hour Studio",
     description="Create Power Hour videos with smart clip selection and TV casting",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -71,6 +75,7 @@ app.include_router(render.router)
 app.include_router(cast.router)
 app.include_router(auto_generate.router)
 app.include_router(changeover.router)
+app.include_router(ai_transitions.router)
 
 
 @app.get("/api/health")
@@ -78,7 +83,10 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "ok",
-        "version": "0.1.0",
+        "version": APP_VERSION,
+        # LAN address + frontend port for links another device can open ("" = unknown).
+        "lan_host": settings.lan_host,
+        "frontend_port": settings.frontend_port,
     }
 
 

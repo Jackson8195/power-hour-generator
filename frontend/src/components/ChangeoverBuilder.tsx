@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Film, Loader2, Trash2, Image, Youtube, Upload, Music, Search, Scissors } from "lucide-react";
+import { Film, Trash2, Image, Youtube, Upload, Music, Search, Scissors } from "lucide-react";
+import Spinner from "./Spinner";
 import clsx from "clsx";
 import type { ChangoverClip, SearchResult } from "../utils/types";
 import {
@@ -13,7 +14,11 @@ import {
   buildChangoverVideoTrim,
   deleteChangoverClip,
   searchYouTube,
+  DEFAULT_TRANSITION_WRAP,
+  type TransitionWrap,
 } from "../utils/api";
+import TransitionWrapControls from "./TransitionWrapControls";
+import { useConfirm } from "./ConfirmDialog";
 
 interface ChangeoverBuilderProps {
   projectId: number;
@@ -27,6 +32,7 @@ interface ChangeoverBuilderProps {
  * and scoped to a single project id.
  */
 export default function ChangeoverBuilder({ projectId, onClipChange }: ChangeoverBuilderProps) {
+  const confirm = useConfirm();
   const [changoverClip, setChangoverClip] = useState<ChangoverClip | null>(null);
   const [showChangoverBuilder, setShowChangoverBuilder] = useState(false);
   const [changoverMode, setChangoverMode] = useState<"image_audio" | "youtube" | "local_video">("image_audio");
@@ -51,6 +57,8 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
   // general
   const [buildingChangover, setBuildingChangover] = useState(false);
   const [changoverError, setChangoverError] = useState<string | null>(null);
+  // countdown + DRINK! ending added around whatever the user builds
+  const [wrap, setWrap] = useState<TransitionWrap>(DEFAULT_TRANSITION_WRAP);
   const changoverImageInputRef = useRef<HTMLInputElement>(null);
   const changoverAudioInputRef = useRef<HTMLInputElement>(null);
   const changoverVideoInputRef = useRef<HTMLInputElement>(null);
@@ -92,7 +100,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
         image: changoverImageFile ?? undefined,
         audio: changoverAudioFile ?? undefined,
         duration: changoverDuration,
-      });
+      }, wrap);
       applyClip(clip);
       setShowChangoverBuilder(false);
       setChangoverImageFile(null);
@@ -144,7 +152,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       const clip = await buildChangoverYoutubeAudio(projectId, {
         audio_trim_start: ytAudioTrimStart,
         duration: changoverDuration,
-      });
+      }, wrap);
       applyClip(clip);
       setShowChangoverBuilder(false);
       setChangoverImageFile(null);
@@ -204,7 +212,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       const clip = await buildChangoverVideoTrim(projectId, {
         trim_start: changoverTrimStart,
         trim_end: changoverTrimEnd,
-      });
+      }, wrap);
       applyClip(clip);
       setShowChangoverBuilder(false);
     } catch (err) {
@@ -215,6 +223,13 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
   }
 
   async function handleDeleteChangover() {
+    const ok = await confirm({
+      title: "DELETE TRANSITION?",
+      body: "The shot notification clip will be deleted. Renders will play clips back to back until you build a new one.",
+      confirmLabel: "DELETE",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await deleteChangoverClip(projectId);
       applyClip(null);
@@ -230,7 +245,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       <span className="retro-panel__label retro-panel__label--pink">SHOT NOTIFICATION</span>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Film className="h-4 w-4 text-[#ff77c2]" />
+          <Film className="h-4 w-4 text-magenta-soft" />
           {changoverClip?.status === "ready" && (
             <span className="retro-chip retro-chip--ok">
               READY · {changoverClip.duration.toFixed(1)}s
@@ -238,7 +253,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
           )}
           {changoverClip?.status === "downloading" && (
             <span className="retro-chip retro-chip--info">
-              <Loader2 className="h-3 w-3 animate-spin" /> DOWNLOADING
+              <Spinner className="h-3 w-3" /> DOWNLOADING
             </span>
           )}
           {changoverClip?.status === "downloaded" && (
@@ -252,8 +267,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
           {changoverClip && (
             <button
               onClick={handleDeleteChangover}
-              className="rounded-bezel p-1.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              className="icon-button icon-button--danger"
               title="Delete shot notification"
+              aria-label="Delete shot notification"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -263,7 +279,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
               setShowChangoverBuilder((v) => !v);
               setChangoverError(null);
             }}
-            className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em]"
+            className="crt-action retro-button-secondary inline-flex items-center gap-2 px-3 py-2 font-retro text-lg tracking-[0.16em]"
           >
             <span className="crt-action__label" data-text={showChangoverBuilder ? "CANCEL" : changoverClip ? "REBUILD" : "CREATE"}>
               {showChangoverBuilder ? "CANCEL" : changoverClip ? "REBUILD" : "CREATE"}
@@ -275,24 +291,24 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       {/* Ready preview */}
       {!showChangoverBuilder && changoverClip?.status === "ready" && changoverClip.preview_url && (
         <div className="mt-4">
-          <video
+          <video playsInline
             src={changoverClip.preview_url}
             controls
-            className="w-full max-w-sm rounded-bezel border border-[#1affe4]/12 bg-black"
+            className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black"
           />
         </div>
       )}
 
       {/* No clip note */}
       {!showChangoverBuilder && !changoverClip && (
-        <p className="mt-3 font-mono text-sm text-[#91fff2]/60">
+        <p className="mt-3 type-body">
           No shot notification — render will play clips back to back.
         </p>
       )}
 
       {/* Downloading state */}
       {!showChangoverBuilder && changoverClip?.status === "downloading" && (
-        <p className="mt-3 font-mono text-sm text-[#91fff2]/70">
+        <p className="mt-3 type-body">
           Downloading from YouTube… this will be ready to trim shortly.
         </p>
       )}
@@ -301,14 +317,15 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       {!showChangoverBuilder && changoverClip?.status === "downloaded" && (
         <div className="mt-4 space-y-3">
           {changoverClip.raw_video_url && (
-            <video
+            <video playsInline
               src={changoverClip.raw_video_url}
               controls
-              className="w-full max-w-sm rounded-bezel border border-[#1affe4]/12 bg-black"
+              className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black"
             />
           )}
+          <TransitionWrapControls value={wrap} onChange={setWrap} />
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+            <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
               START (s)
               <input
                 type="number"
@@ -319,7 +336,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                 className="retro-input w-20 px-2 py-1 font-mono text-sm"
               />
             </label>
-            <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+            <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
               END (s)
               <input
                 type="number"
@@ -333,9 +350,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
             <button
               onClick={handleBuildVideoChangover}
               disabled={buildingChangover || changoverTrimEnd <= changoverTrimStart}
-              className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+              className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-lg tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}
+              {buildingChangover ? <Spinner className="h-3.5 w-3.5" /> : <Scissors className="h-3.5 w-3.5" />}
               <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
             </button>
           </div>
@@ -358,10 +375,10 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                   key={mode}
                   onClick={() => { setChangoverMode(mode); setChangoverError(null); }}
                   className={clsx(
-                    "inline-flex items-center gap-2 border px-3 py-2 font-retro text-base tracking-[0.16em] transition-all",
+                    "inline-flex items-center gap-2 border px-3 py-2 font-retro text-lg tracking-[0.16em] transition-all",
                     changoverMode === mode
-                      ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb]"
-                      : "border-[#1affe4]/14 bg-[#08131a] text-[#91fff2]/70 hover:border-[#1affe4]/28"
+                      ? "border-magenta/40 bg-crt-wine text-magenta-pale"
+                      : "border-phosphor/14 bg-crt-panel text-phosphor-text/70 hover:border-phosphor/28"
                   )}
                 >
                   {icons[mode]}
@@ -371,6 +388,8 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
             })}
           </div>
 
+          <TransitionWrapControls value={wrap} onChange={setWrap} />
+
           {/* IMAGE + AUDIO mode */}
           {changoverMode === "image_audio" && (
             <div className="space-y-3">
@@ -378,7 +397,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
               <div>
                 <button
                   onClick={() => changoverImageInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-base tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
+                  className="inline-flex items-center gap-2 border border-phosphor/20 bg-crt-panel px-3 py-2 font-retro text-lg tracking-[0.16em] text-phosphor-text/70 hover:border-phosphor/40 transition-colors"
                 >
                   <Image className="h-3.5 w-3.5" />
                   {changoverImageFile ? changoverImageFile.name : "CHOOSE IMAGE (OPTIONAL)"}
@@ -397,10 +416,10 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                 <button
                   onClick={() => { setAudioSource("local"); setChangoverError(null); }}
                   className={clsx(
-                    "inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-retro text-sm tracking-[0.14em] transition-all",
+                    "inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-retro text-lg tracking-[0.14em] transition-all",
                     audioSource === "local"
-                      ? "border-[#1affe4]/40 bg-[#08131a] text-[#defffb]"
-                      : "border-[#1affe4]/14 bg-transparent text-[#91fff2]/50 hover:border-[#1affe4]/28"
+                      ? "border-phosphor/40 bg-crt-panel text-phosphor-bright"
+                      : "border-phosphor/14 bg-transparent text-phosphor-text/50 hover:border-phosphor/28"
                   )}
                 >
                   <Music className="h-3 w-3" /> UPLOAD FILE
@@ -408,10 +427,10 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                 <button
                   onClick={() => { setAudioSource("youtube"); setChangoverError(null); }}
                   className={clsx(
-                    "inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-retro text-sm tracking-[0.14em] transition-all",
+                    "inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-retro text-lg tracking-[0.14em] transition-all",
                     audioSource === "youtube"
-                      ? "border-[#ff2b9d]/40 bg-[#2b0b1d] text-[#ffd7eb]"
-                      : "border-[#1affe4]/14 bg-transparent text-[#91fff2]/50 hover:border-[#1affe4]/28"
+                      ? "border-magenta/40 bg-crt-wine text-magenta-pale"
+                      : "border-phosphor/14 bg-transparent text-phosphor-text/50 hover:border-phosphor/28"
                   )}
                 >
                   <Youtube className="h-3 w-3" /> FROM YOUTUBE
@@ -424,7 +443,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                   <div>
                     <button
                       onClick={() => changoverAudioInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 border border-[#1affe4]/20 bg-[#08131a] px-3 py-2 font-retro text-base tracking-[0.16em] text-[#91fff2]/70 hover:border-[#1affe4]/40 transition-colors"
+                      className="inline-flex items-center gap-2 border border-phosphor/20 bg-crt-panel px-3 py-2 font-retro text-lg tracking-[0.16em] text-phosphor-text/70 hover:border-phosphor/40 transition-colors"
                     >
                       <Music className="h-3.5 w-3.5" />
                       {changoverAudioFile ? changoverAudioFile.name : "CHOOSE AUDIO"}
@@ -437,16 +456,16 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                       onChange={(e) => setChangoverAudioFile(e.target.files?.[0] ?? null)}
                     />
                   </div>
-                  <label className="flex items-center gap-3 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                  <label className="flex items-center gap-3 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                     DURATION: {changoverDuration}s
                     <input type="range" min={1} max={10} step={0.5} value={changoverDuration} onChange={(e) => setChangoverDuration(Number(e.target.value))} className="w-32" />
                   </label>
                   <button
                     onClick={handleBuildImageAudioChangover}
                     disabled={buildingChangover || (!changoverImageFile && !changoverAudioFile)}
-                    className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-lg tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                    {buildingChangover ? <Spinner className="h-3.5 w-3.5" /> : <Film className="h-3.5 w-3.5" />}
                     <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
                   </button>
                 </div>
@@ -469,9 +488,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                         <button
                           type="submit"
                           disabled={ytAudioSearching}
-                          className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em] disabled:opacity-40"
+                          className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-3 py-2 font-retro text-lg tracking-[0.16em] disabled:opacity-40"
                         >
-                          {ytAudioSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                          {ytAudioSearching ? <Spinner className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
                         </button>
                       </form>
                       {ytAudioSearchResults.length > 0 && (
@@ -480,12 +499,12 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                             <div key={result.youtube_id} className="tracklist-row">
                               <img src={result.thumbnail} alt={result.title} className="h-10 w-16 shrink-0 object-cover" />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
-                                <p className="font-mono text-sm tracking-[0.12em] text-[#91fff2]/70">{result.artist}{result.duration && ` · ${result.duration}`}</p>
+                                <p className="truncate font-retro text-lg tracking-[0.12em] text-magenta-text">{result.title}</p>
+                                <p className="font-mono text-sm tracking-[0.12em] text-phosphor-text/70">{result.artist}{result.duration && ` · ${result.duration}`}</p>
                               </div>
                               <button
                                 onClick={() => handlePickYtAudio(result)}
-                                className="crt-action retro-button-primary shrink-0 px-3 py-1.5 font-retro text-sm tracking-[0.14em]"
+                                className="crt-action retro-button-primary shrink-0 px-3 py-1.5 font-retro text-lg tracking-[0.14em]"
                               >
                                 <span className="crt-action__label" data-text="RIP">RIP</span>
                               </button>
@@ -497,8 +516,8 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                   )}
                   {/* Downloading */}
                   {changoverClip?.status === "downloading" && changoverClip.source_type === "youtube_audio" && (
-                    <div className="flex items-center gap-2 font-mono text-sm text-[#91fff2]/70">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <div className="flex items-center gap-2 type-body">
+                      <Spinner className="h-3.5 w-3.5" />
                       Ripping audio from YouTube…
                     </div>
                   )}
@@ -507,11 +526,11 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                     <div className="space-y-3">
                       <p className="font-mono text-sm text-green-400/80">Audio ready — set start offset and duration</p>
                       <div className="flex flex-wrap items-center gap-4">
-                        <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                        <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                           START (s)
                           <input type="number" min={0} step={0.5} value={ytAudioTrimStart} onChange={(e) => setYtAudioTrimStart(Number(e.target.value))} className="retro-input w-20 px-2 py-1 font-mono text-sm" />
                         </label>
-                        <label className="flex items-center gap-3 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                        <label className="flex items-center gap-3 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                           DURATION: {changoverDuration}s
                           <input type="range" min={1} max={10} step={0.5} value={changoverDuration} onChange={(e) => setChangoverDuration(Number(e.target.value))} className="w-32" />
                         </label>
@@ -519,9 +538,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                       <button
                         onClick={handleBuildYoutubeAudio}
                         disabled={buildingChangover}
-                        className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-lg tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                        {buildingChangover ? <Spinner className="h-3.5 w-3.5" /> : <Film className="h-3.5 w-3.5" />}
                         <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
                       </button>
                     </div>
@@ -547,9 +566,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                     <button
                       type="submit"
                       disabled={changoverSearching}
-                      className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-3 py-2 font-retro text-base tracking-[0.16em] disabled:opacity-40"
+                      className="crt-action retro-button-primary inline-flex shrink-0 items-center gap-2 px-3 py-2 font-retro text-lg tracking-[0.16em] disabled:opacity-40"
                     >
-                      {changoverSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                      {changoverSearching ? <Spinner className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
                     </button>
                   </form>
                   {changoverSearchResults.length > 0 && (
@@ -558,12 +577,12 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                         <div key={result.youtube_id} className="tracklist-row">
                           <img src={result.thumbnail} alt={result.title} className="h-12 w-20 shrink-0 object-cover" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-retro text-base tracking-[0.12em] text-[#ffb6dd]">{result.title}</p>
-                            <p className="font-mono text-sm tracking-[0.12em] text-[#91fff2]/70">{result.artist}{result.duration && ` · ${result.duration}`}</p>
+                            <p className="truncate font-retro text-lg tracking-[0.12em] text-magenta-text">{result.title}</p>
+                            <p className="font-mono text-sm tracking-[0.12em] text-phosphor-text/70">{result.artist}{result.duration && ` · ${result.duration}`}</p>
                           </div>
                           <button
                             onClick={() => handleChangoverPickYoutube(result)}
-                            className="crt-action retro-button-primary shrink-0 px-3 py-1.5 font-retro text-sm tracking-[0.14em]"
+                            className="crt-action retro-button-primary shrink-0 px-3 py-1.5 font-retro text-lg tracking-[0.14em]"
                           >
                             <span className="crt-action__label" data-text="USE">USE</span>
                           </button>
@@ -574,31 +593,31 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                 </>
               )}
               {changoverClip?.status === "downloading" && changoverClip.source_type === "youtube" && (
-                <div className="flex items-center gap-2 font-mono text-sm text-[#91fff2]/70">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <div className="flex items-center gap-2 type-body">
+                  <Spinner className="h-3.5 w-3.5" />
                   Downloading from YouTube… Once complete the trim controls will appear.
                 </div>
               )}
               {changoverClip?.status === "downloaded" && changoverClip.source_type === "youtube" && (
                 <div className="space-y-3">
                   {changoverClip.raw_video_url && (
-                    <video src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-[#1affe4]/12 bg-black" />
+                    <video playsInline src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
                   )}
                   <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                       START (s)
                       <input type="number" min={0} step={0.5} value={changoverTrimStart} onChange={(e) => setChangoverTrimStart(Number(e.target.value))} className="retro-input w-20 px-2 py-1 font-mono text-sm" />
                     </label>
-                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                       END (s)
                       <input type="number" min={0.5} step={0.5} value={changoverTrimEnd} onChange={(e) => setChangoverTrimEnd(Number(e.target.value))} className="retro-input w-20 px-2 py-1 font-mono text-sm" />
                     </label>
                     <button
                       onClick={handleBuildVideoChangover}
                       disabled={buildingChangover || changoverTrimEnd <= changoverTrimStart}
-                      className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-lg tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}
+                      {buildingChangover ? <Spinner className="h-3.5 w-3.5" /> : <Scissors className="h-3.5 w-3.5" />}
                       <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
                     </button>
                   </div>
@@ -615,8 +634,8 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                   className={clsx(
                     "flex flex-col items-center justify-center gap-3 border-2 border-dashed px-6 py-10 transition-colors cursor-pointer",
                     changoverVideoDropActive
-                      ? "border-[#ff2b9d]/60 bg-[#2b0b1d]/40"
-                      : "border-[#1affe4]/20 bg-[#08131a] hover:border-[#1affe4]/40"
+                      ? "border-magenta/60 bg-crt-wine/40"
+                      : "border-phosphor/20 bg-crt-panel hover:border-phosphor/40"
                   )}
                   onDragOver={(e) => { e.preventDefault(); setChangoverVideoDropActive(true); }}
                   onDragLeave={() => setChangoverVideoDropActive(false)}
@@ -628,9 +647,9 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
                   }}
                   onClick={() => changoverVideoInputRef.current?.click()}
                 >
-                  <Upload className="h-6 w-6 text-[#1affe4]/50" />
-                  <p className="font-retro text-lg tracking-[0.16em] text-[#91fff2]/70">DROP VIDEO FILE HERE</p>
-                  <p className="font-mono text-sm text-[#91fff2]/55">or click to browse · mp4 mov avi mkv webm</p>
+                  <Upload className="h-6 w-6 text-phosphor/50" />
+                  <p className="font-retro text-lg tracking-[0.16em] text-phosphor-text/70">DROP VIDEO FILE HERE</p>
+                  <p className="font-mono text-sm text-phosphor-text/55">or click to browse · mp4 mov avi mkv webm</p>
                   <input
                     ref={changoverVideoInputRef}
                     type="file"
@@ -646,23 +665,23 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
               {changoverClip?.status === "downloaded" && changoverClip.source_type === "local_video" && (
                 <div className="space-y-3">
                   {changoverClip.raw_video_url && (
-                    <video src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-[#1affe4]/12 bg-black" />
+                    <video playsInline src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
                   )}
                   <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                       START (s)
                       <input type="number" min={0} step={0.5} value={changoverTrimStart} onChange={(e) => setChangoverTrimStart(Number(e.target.value))} className="retro-input w-20 px-2 py-1 font-mono text-sm" />
                     </label>
-                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-[#91fff2]/75">
+                    <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
                       END (s)
                       <input type="number" min={0.5} step={0.5} value={changoverTrimEnd} onChange={(e) => setChangoverTrimEnd(Number(e.target.value))} className="retro-input w-20 px-2 py-1 font-mono text-sm" />
                     </label>
                     <button
                       onClick={handleBuildVideoChangover}
                       disabled={buildingChangover || changoverTrimEnd <= changoverTrimStart}
-                      className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-base tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="crt-action retro-button-primary inline-flex items-center gap-2 px-4 py-2 font-retro text-lg tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {buildingChangover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}
+                      {buildingChangover ? <Spinner className="h-3.5 w-3.5" /> : <Scissors className="h-3.5 w-3.5" />}
                       <span className="crt-action__label" data-text="BUILD SHOT CLIP">BUILD SHOT CLIP</span>
                     </button>
                   </div>

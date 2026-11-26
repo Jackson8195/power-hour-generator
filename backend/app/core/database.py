@@ -26,7 +26,7 @@ async def get_db() -> AsyncSession:
 
 async def init_db():
     """Create all tables on startup."""
-    from app.core.migrations import migrate_changeover_table
+    from app.core.migrations import add_missing_columns, migrate_changeover_table
 
     async with engine.begin() as conn:
         # Model modules must be imported so their tables are registered before migrating.
@@ -34,3 +34,4 @@ async def init_db():
 
         await conn.run_sync(migrate_changeover_table)
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(add_missing_columns)
