@@ -50,7 +50,7 @@ from app.services.transition_fx import (
     pick_bundled_art,
     probe_duration,
 )
-from app.services.youtube import download_video, search_youtube
+from app.services.youtube import _meaningful_terms, _normalize_text, download_video, search_youtube
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,11 @@ DARK_BACKGROUNDS = ("black", "navy", "maroon", "forest")
 MAX_COUNT = 8
 SHORT_SOURCE_SECONDS = 90  # preferred: short clips/memes download fast and are mostly "moment"
 MAX_SOURCE_SECONDS = 600  # never download anything longer for a 5 second transition
-YOUTUBE_CANDIDATES = 3  # results tried (download/build) before falling back to a card
+YOUTUBE_CANDIDATES = 3  # results tried (download/build) per search before the next search
+REVIEW_POOL = 8  # usable results sent to the AI review per search
+QUERY_CHARS = 80
+# Talk moments: the transition's 4s should land on a line, not on applause or a music bed.
+MOMENT_MUSIC_LIKENESS = 0.0
 FALLBACK_HEADLINE = "SHOT!"
 ART_PROMPT_CHARS = 400
 STYLE_CHARS = 300
@@ -97,6 +101,8 @@ class TransitionSpec:
     sound: str = DEFAULT_SOUND
     duration: float = CARD_SECONDS
     query: str = ""
+    fallback_query: str = ""  # a broader search for the same idea, tried when ``query`` finds nothing
+    context: str = ""  # power hour prompt + transition direction, for the result review
     art_prompt: str = ""  # what the AI wants illustrated (sent to the image model, never ffmpeg)
     art_path: str = ""    # set once art is generated (or a bundled drink image is chosen)
     # Set by a video build: the kept full source (for re-trimming), the used range in it, and
@@ -142,7 +148,7 @@ def sanitize_spec(raw: dict, sources: str, index: int = 0) -> TransitionSpec | N
     headline = (
         _clean_text(raw.get("headline"), 18) or _clean_text(raw.get("label"), 18) or FALLBACK_HEADLINE
     )
-    query = _clean_text(raw.get("query"), 80)
+    query = _clean_text(raw.get("query"), QUERY_CHARS)
     label = _clean_text(raw.get("label"), 60) or headline
     if not query and kind == "youtube":
         query = label  # a youtube transition needs something to search for
@@ -165,6 +171,7 @@ def sanitize_spec(raw: dict, sources: str, index: int = 0) -> TransitionSpec | N
         sound=_pick(raw.get("sound"), available_sounds()) or (available_sounds() or SOUNDS)[index % len(available_sounds() or SOUNDS)],
         duration=VIDEO_CLIP_SECONDS if kind == "youtube" else CARD_SECONDS,
         query=query,
+        fallback_query=_clean_text(raw.get("fallback_query"), QUERY_CHARS),
         art_prompt=_clean_text(raw.get("art_prompt"), ART_PROMPT_CHARS),
     )
 
@@ -278,7 +285,7 @@ async def plan_transitions(
                     "moment that ends with the call word over its last frame (no illustration). "
                     'Return only strict JSON shaped as {"style": string, "transitions": [{"kind": "card" | '
                     '"youtube", "label": string, "art_prompt": string, "hit_text": string, "sound": string, '
-                    '"text_color": string, "query": string}]}. '
+                    '"text_color": string, "query": string, "fallback_query": string}]}. '
                     "style: one shared art direction for the whole set (palette, era, rendering style) so the "
                     "hour looks designed. "
                     "art_prompt: a vivid description of one illustration that always features a drink (a shot "
@@ -288,9 +295,15 @@ async def plan_transitions(
                     "label: 2-5 words naming the transition. "
                     f"hit_text: one of {', '.join(HIT_WORDS)}. sound: one of {', '.join(available_sounds())}. "
                     f"text_color (for the call word): one of {', '.join(c for c in PALETTE if c not in DARK_BACKGROUNDS)}. "
-                    "query: a YouTube search for a short, recognizable, safe-for-work NON-MUSIC moment "
-                    "that fits the theme (a reaction, catchphrase, blooper, famous quote, meme or sound "
-                    "effect). Never a song, music video or musical performance." + avoid + " " + mix
+                    "query: a SHORT YouTube search (3-6 words) for a short, recognizable, safe-for-work "
+                    "NON-MUSIC moment that fits the theme (a reaction, catchphrase, blooper, famous quote, "
+                    "insult, meme or sound effect). Write it the way people title uploads: the person and "
+                    "the show plus the kind of moment, e.g. 'Simon Cowell harsh comments American Idol'. "
+                    "No season or episode numbers, years, quoted lines or long descriptions: over-specific "
+                    "searches find nothing. Keep every query on the exact show/franchise the theme names. "
+                    "fallback_query: a broader 2-4 word search for the same idea, e.g. "
+                    "'Simon Cowell insults'. "
+                    "Never a song, music video or musical performance." + avoid + " " + mix
                 ),
             },
             {"role": "user", "content": user_content},
@@ -299,7 +312,11 @@ async def plan_transitions(
     payload = json.loads(response.choices[0].message.content or "{}")
     specs = sanitize_specs(payload.get("transitions"), count, sources)
     style = _clean_text(payload.get("style"), STYLE_CHARS)
+    context = f"Power hour: {_clean_text(theme, 400)}"
+    if direction:
+        context += f" | Transitions: {direction}"
     for spec in specs:
+        spec.context = context
         if spec.art_prompt and style:
             spec.art_prompt = f"{style}. {spec.art_prompt}"
     return specs
@@ -388,12 +405,47 @@ def _looks_like_playlist_song(title: str, playlist_titles: list[str]) -> bool:
     return False
 
 
+def _relevance(result, query: str) -> float:
+    """Share of the search's meaningful words found in the result's title + channel."""
+    terms = _meaningful_terms(query)
+    if not terms:
+        return 1.0
+    haystack = f" {_normalize_text(result.title)} {_normalize_text(getattr(result, 'artist', '') or '')} "
+    return sum(1 for term in terms if f" {term} " in haystack) / len(terms)
+
+
+_SPECIFIC_WORDS = re.compile(
+    r"\b(?:season|series|episode|ep|s\d+|e\d+|week|round|part|spoken|audition(?:s)?\s+day)\b|\b\d+\b",
+    re.IGNORECASE,
+)
+
+
+def broaden_query(query: str, words: int = 4) -> str:
+    """A shorter search for the same idea: drop season/episode numbers, years and filler,
+    keep the first few words (they name the person and the show)."""
+    cleaned = " ".join(_SPECIFIC_WORDS.sub(" ", query or "").split())
+    return " ".join(cleaned.split()[:words])
+
+
+def search_plan(spec: TransitionSpec) -> list[str]:
+    """The searches tried in order for a video transition: the planner's query, its broader
+    fallback, then an automatically shortened query; no repeats."""
+    seen: list[str] = []
+    for query in (spec.query, spec.fallback_query, broaden_query(spec.query), spec.label):
+        query = (query or "").strip()
+        if query and query.lower() not in (q.lower() for q in seen):
+            seen.append(query)
+    return seen[:3]
+
+
 def choose_youtube_candidates(
-    results: list, exclude_ids: set[str], playlist_titles: list[str]
+    results: list, exclude_ids: set[str], playlist_titles: list[str], query: str = "",
+    limit: int = YOUTUBE_CANDIDATES,
 ) -> list:
     """Order usable search results for a transition: never a video already in the playlist
     (or used by another transition), never something that looks like a playlist song,
-    nothing too long to download; short videos first."""
+    nothing too long to download. Most relevant to ``query`` first (title words), then short
+    videos before longer ones, then the search's own order."""
     usable = []
     for result in results:
         if not result.youtube_id or result.youtube_id in exclude_ids:
@@ -404,8 +456,71 @@ def choose_youtube_candidates(
         if seconds is not None and seconds > MAX_SOURCE_SECONDS:
             continue
         usable.append(result)
-    short = [r for r in usable if (_duration_seconds(r.duration) or 10**6) <= SHORT_SOURCE_SECONDS]
-    return (short + [r for r in usable if r not in short])[:YOUTUBE_CANDIDATES]
+
+    def rank(pair):
+        position, result = pair
+        relevance = round(_relevance(result, query), 2) if query else 1.0
+        short = (_duration_seconds(result.duration) or 10**6) <= SHORT_SOURCE_SECONDS
+        return (-relevance, not short, position)
+
+    return [result for _, result in sorted(enumerate(usable), key=rank)][:limit]
+
+
+TRANSITION_REVIEW_PROMPT = (
+    "You check YouTube search results for a drinking-game power hour TRANSITION: a few seconds of a "
+    "funny, recognizable, non-music moment that plays between songs. You get the power hour's theme "
+    "and the user's direction for the transitions, the moment wanted, and numbered results with their "
+    "real title, channel and length. Reject a result when its title or channel shows it does not fit: "
+    "a different show, franchise or competition than the one named (even with shared judges or hosts, "
+    "e.g. Got Talent or X Factor for American Idol), a person, era or season outside what is asked, a "
+    "song, music video or full musical performance, news, interviews, podcasts, reaction or commentary "
+    "videos about the moment instead of the moment itself (unless asked for), or anything unrelated. "
+    "Do not reject only because a detail is missing from the title; reject on evidence. "
+    'Return only strict JSON shaped as {"reject": [numbers]} (an empty list when all fit).'
+)
+
+
+async def review_transition_results(spec: TransitionSpec, results: list) -> list:
+    """Drop the results the AI says don't fit the theme/direction. Fails open: any error keeps
+    every result, so a flaky review never blocks a transition."""
+    if not results:
+        return results
+    listing = "\n".join(
+        f"{n}. {r.title} | channel: {getattr(r, 'artist', '') or '?'} | length: {r.duration or '?'}"
+        for n, r in enumerate(results, start=1)
+    )
+    wanted = f"{spec.label} (search: {spec.query})"
+    try:
+        from app.services.auto_generate import _get_openai_client  # lazy: avoids an import cycle
+
+        client = _get_openai_client()
+        response = await client.chat.completions.create(
+            model=settings.openai_review_model or settings.openai_model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": TRANSITION_REVIEW_PROMPT},
+                {"role": "user", "content": f"{spec.context or 'Power hour'}\nMoment wanted: {wanted}\n\nResults:\n{listing}"},
+            ],
+        )
+        payload = json.loads(response.choices[0].message.content or "{}")
+        raw = payload.get("reject", []) if isinstance(payload, dict) else []
+    except Exception as exc:
+        logger.info("Transition result review unavailable; keeping %d results: %s", len(results), exc)
+        return results
+    rejected = set()
+    for number in raw if isinstance(raw, list) else []:
+        try:
+            index = int(number) - 1
+        except (TypeError, ValueError):
+            continue
+        if 0 <= index < len(results):
+            rejected.add(index)
+    if rejected:
+        logger.info(
+            "Transition review rejected %d of %d for %r: %s",
+            len(rejected), len(results), spec.query, [results[i].title for i in sorted(rejected)],
+        )
+    return [r for i, r in enumerate(results) if i not in rejected]
 
 
 async def _pick_moment(path: str, source_seconds: float, clip_seconds: float) -> tuple[float, list, float]:
@@ -417,7 +532,9 @@ async def _pick_moment(path: str, source_seconds: float, clip_seconds: float) ->
     try:
         from app.services.audio_analysis import analyze_audio
 
-        analysis = await analyze_audio(path, clip_duration=max(1, round(clip_seconds)))
+        analysis = await analyze_audio(
+            path, clip_duration=max(1, round(clip_seconds)), music_likeness=MOMENT_MUSIC_LIKENESS
+        )
         if analysis.get("duration"):
             source_seconds = float(analysis["duration"])
             start = float(analysis.get("suggested_start") or 0.0)
@@ -464,55 +581,78 @@ async def _build_youtube(
     exclude_ids: set[str],
     playlist_titles: list[str],
 ) -> tuple[str, float]:
-    """Find, download and cut a punchy moment, then end it on the drink-art stinger.
+    """Find, download and cut a punchy moment, then end it on the call word.
 
+    Tries the planner's query, then broader searches (``search_plan``). Each search's usable
+    results are ranked by relevance and checked by the AI review against the theme and the
+    user's direction before anything is downloaded.
     Returns ``(youtube_id, length)``. Raises with the reason when nothing usable was found.
     """
-    results = await search_youtube(spec.query, max_results=8, music=False)
-    candidates = choose_youtube_candidates(results, exclude_ids, playlist_titles)
-    if not candidates:
-        raise RuntimeError(
-            f"no usable results ({len(results)} found, all in the playlist, song-like, or too long)"
+    errors: list[str] = []
+    tried: set[str] = set()
+    for query in search_plan(spec):
+        results = await search_youtube(query, max_results=10, music=False)
+        pool = choose_youtube_candidates(
+            results, exclude_ids | tried, playlist_titles, query=query, limit=REVIEW_POOL
         )
+        if not pool:
+            errors.append(f"{query!r}: no usable results ({len(results)} found)")
+            continue
+        kept = await review_transition_results(spec, pool)
+        if not kept:
+            errors.append(f"{query!r}: all {len(pool)} results off-topic")
+            continue
+        for candidate in kept[:YOUTUBE_CANDIDATES]:
+            tried.add(candidate.youtube_id)
+            built = await _try_candidate(spec, project_id, index, output_path, resolution, candidate, errors)
+            if built is not None:
+                if query != spec.query:
+                    logger.info("AI transition %s: found via broader search %r", index, query)
+                return built
+    raise RuntimeError("; ".join(errors)[:500] or "no usable results")
 
-    errors = []
-    for candidate in candidates:
-        raw_stem = f"project_{project_id}_ai_{index}_{uuid4().hex[:6]}_raw"
-        raw_path: Path | None = None
-        kept: Path | None = None
-        try:
-            info = await download_video(
-                candidate.youtube_id, output_dir=settings.changeover_dir, file_stem=raw_stem
-            )
-            raw_path = Path(info["file_path"])
-            source_seconds = float(info.get("duration") or 0.0)
-            start, waveform, source_seconds = await _pick_moment(str(raw_path), source_seconds, VIDEO_CLIP_SECONDS)
-            # Keep the WHOLE download beside the transition so the user can watch all of it and
-            # re-trim to any part. It is deleted when the power hour is rendered (or trashed).
-            kept = Path(output_path).with_name(Path(output_path).stem + "_src" + raw_path.suffix)
-            raw_path.replace(kept)
-            raw_path = None
-            spec.source_path, spec.waveform, spec.source_seconds = str(kept), waveform, source_seconds
-            clip_seconds = VIDEO_CLIP_SECONDS
-            if source_seconds:
-                clip_seconds = max(MIN_TRIM_SECONDS, min(VIDEO_CLIP_SECONDS, source_seconds - start))
-            length = await _render_moment(spec, output_path, str(kept), start, clip_seconds, resolution)
-            spec.trim_start, spec.trim_end = round(start, 2), round(start + clip_seconds, 2)
-            logger.info(
-                "AI transition %s: using %s (%r) from %.1fs", index, candidate.youtube_id, candidate.title, start
-            )
-            return candidate.youtube_id, length
-        except Exception as exc:
-            errors.append(f"{candidate.youtube_id}: {exc}")
-            if kept is not None:
-                kept.unlink(missing_ok=True)
-            spec.source_path, spec.waveform, spec.source_seconds = "", None, 0.0
-        finally:
-            if raw_path is not None:
-                raw_path.unlink(missing_ok=True)
-            for stray in settings.changeover_dir.glob(f"{raw_stem}*"):
-                stray.unlink(missing_ok=True)
-    raise RuntimeError("; ".join(errors)[:500])
+
+async def _try_candidate(
+    spec: TransitionSpec, project_id: int, index: int, output_path: str, resolution: str,
+    candidate, errors: list[str],
+) -> tuple[str, float] | None:
+    """Download one result and build the transition from it; None (reason appended) on failure."""
+    raw_stem = f"project_{project_id}_ai_{index}_{uuid4().hex[:6]}_raw"
+    raw_path: Path | None = None
+    kept: Path | None = None
+    try:
+        info = await download_video(
+            candidate.youtube_id, output_dir=settings.changeover_dir, file_stem=raw_stem
+        )
+        raw_path = Path(info["file_path"])
+        source_seconds = float(info.get("duration") or 0.0)
+        start, waveform, source_seconds = await _pick_moment(str(raw_path), source_seconds, VIDEO_CLIP_SECONDS)
+        # Keep the WHOLE download beside the transition so the user can watch all of it and
+        # re-trim to any part. It is deleted when the power hour is rendered (or trashed).
+        kept = Path(output_path).with_name(Path(output_path).stem + "_src" + raw_path.suffix)
+        raw_path.replace(kept)
+        raw_path = None
+        spec.source_path, spec.waveform, spec.source_seconds = str(kept), waveform, source_seconds
+        clip_seconds = VIDEO_CLIP_SECONDS
+        if source_seconds:
+            clip_seconds = max(MIN_TRIM_SECONDS, min(VIDEO_CLIP_SECONDS, source_seconds - start))
+        length = await _render_moment(spec, output_path, str(kept), start, clip_seconds, resolution)
+        spec.trim_start, spec.trim_end = round(start, 2), round(start + clip_seconds, 2)
+        logger.info(
+            "AI transition %s: using %s (%r) from %.1fs", index, candidate.youtube_id, candidate.title, start
+        )
+        return candidate.youtube_id, length
+    except Exception as exc:
+        errors.append(f"{candidate.youtube_id}: {exc}")
+        if kept is not None:
+            kept.unlink(missing_ok=True)
+        spec.source_path, spec.waveform, spec.source_seconds = "", None, 0.0
+    finally:
+        if raw_path is not None:
+            raw_path.unlink(missing_ok=True)
+        for stray in settings.changeover_dir.glob(f"{raw_stem}*"):
+            stray.unlink(missing_ok=True)
+    return None
 
 
 async def _render_moment(

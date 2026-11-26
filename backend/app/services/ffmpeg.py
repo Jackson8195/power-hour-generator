@@ -319,6 +319,40 @@ def edge_fades(duration: float) -> tuple[str, str]:
     return video, audio
 
 
+def mark_song_positions(clips: list[dict]) -> None:
+    """Tag each song with ``song_number`` / ``song_total`` (transitions don't count) and
+    ``followed_by_changeover`` when the next entry is a transition."""
+    songs = [clip for clip in clips if not clip.get("is_changeover")]
+    for number, clip in enumerate(songs, start=1):
+        clip["song_number"], clip["song_total"] = number, len(songs)
+    for clip, following in zip(clips, clips[1:] + [None]):
+        if not clip.get("is_changeover"):
+            clip["followed_by_changeover"] = bool(following and following.get("is_changeover"))
+
+
+def _counter_font() -> str:
+    """The transitions' bold font for the counter, when its path is safe inside a filter graph
+    (no drive colon or quote, i.e. Linux/Docker/macOS). Otherwise "" = fontconfig default."""
+    from app.services.transition_fx import _find_font  # lazy: transition_fx imports this module
+
+    font = _find_font()
+    text = font.as_posix() if font else ""
+    return text if text and ":" not in text and "'" not in text else ""
+
+
+def song_counter_filter(number: int, total: int, height: int, fontfile: str | None = None) -> str:
+    """drawtext for the small "12 / 60" in the top-right corner (only integers reach ffmpeg)."""
+    size = max(18, int(height * 0.045))
+    pad = max(6, int(height * 0.014))
+    font = _counter_font() if fontfile is None else fontfile
+    font_opt = f"fontfile='{font}':" if font else ""
+    return (
+        f"drawtext={font_opt}text='{int(number)} / {int(total)}':fontsize={size}:fontcolor=white@0.9:"
+        f"box=1:boxcolor=black@0.55:boxborderw={pad}:borderw=1:bordercolor=black:"
+        f"x=w-text_w-w*0.03-{pad}:y=h*0.04+{pad}"
+    )
+
+
 class RenderPipeline:
     """Renders a Power Hour video from a list of clips."""
 
@@ -333,8 +367,12 @@ class RenderPipeline:
         include_countdown: bool = True,
         progress_callback: Optional[Callable[[float], None]] = None,
         on_encoder_selected: Optional[Callable[[bool], None]] = None,
+        include_counter: bool = True,
     ):
         self.clips = clips  # List of {file_path, start_time, end_time, title}
+        # Song position ("12 / 60") in the top-right corner of every song (never transitions).
+        self.include_counter = include_counter
+        mark_song_positions(self.clips)
         self.output_path = Path(output_path)
         self.width, self.height = map(int, resolution.split("x"))
         self.transition_type = transition_type
@@ -420,11 +458,19 @@ class RenderPipeline:
             "setsar=1"
         )
         # Changeover ("SHOT!") clips are interstitials between songs — they must not
-        # get the per-song countdown/DRINK overlay.
-        if self.include_countdown and not clip.get("is_changeover"):
+        # get the per-song countdown/DRINK overlay. A song followed by a transition skips it
+        # too: the transition does its own 3·2·1 + call word, and two countdowns back to back
+        # clash. Songs with no transition after them (or the last song) keep it.
+        if (
+            self.include_countdown
+            and not clip.get("is_changeover")
+            and not clip.get("followed_by_changeover")
+        ):
             countdown_filter = self._build_countdown_filter(duration)
             if countdown_filter:
                 vf = vf + "," + countdown_filter
+        if self.include_counter and clip.get("song_number") and clip.get("song_total"):
+            vf = vf + "," + song_counter_filter(clip["song_number"], clip["song_total"], self.height)
         # Last, so the countdown overlay dips to black with the picture.
         fade_v, fade_a = edge_fades(duration)
         if fade_v:

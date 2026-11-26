@@ -125,6 +125,24 @@ def test_real_art_card_and_clip_with_recorded_cue(tmp_path, monkeypatch):
     duration, _ = _probe(wrapped)
     assert abs(duration - 8.0) < 0.25 and abs(length - 8.0) < 0.25  # whole clip, countdown only
 
+    # video-only ending: no art, the call word + cue over the clip's own held last frame
+    held = tmp_path / "held.mp4"
+    for countdown in (True, False):
+        length = asyncio.run(fx.build_clip_with_stinger(
+            str(held), str(clip), start=1.0, clip_seconds=4.0, resolution="320x180",
+            countdown=countdown, sound="clink", hold_frame=True))
+        duration, has_audio = _probe(held)
+        assert length == pytest.approx(4.0 + fx.VIDEO_TAIL_SECONDS) and abs(duration - length) < 0.25 and has_audio
+
+
+def test_builder_no_art_ending_holds_the_last_frame():
+    from app.api.changeover import HOLD_FRAME_ART, _wrap_options
+
+    held = _wrap_options(True, "can", HOLD_FRAME_ART, "SHOT!")
+    assert held["hold_frame"] and held["art"] is None and held["sound"] == "can"
+    surprise = _wrap_options(True, "can", "", "SHOT!")
+    assert not surprise["hold_frame"]
+
 
 # ─── review flow ────────────────────────────────────────
 
@@ -370,3 +388,18 @@ def test_style_column_is_added_to_an_existing_table():
         add_missing_columns(conn)  # idempotent
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info(changover_clips)"))}
     assert "style" in columns
+
+
+def test_replacing_the_manual_transition_keeps_the_ai_transition_files():
+    from app.api.changeover import delete_changeover_media_files, delete_manual_changeover_files
+
+    folder = settings.changeover_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    manual = [folder / "project_77_raw.mp4", folder / "project_77_changeover.mp4"]
+    ai = folder / "project_77_ai_0_abc123.mp4"
+    for f in [*manual, ai]:
+        f.write_bytes(b"x")
+    delete_manual_changeover_files(77)
+    assert not any(f.exists() for f in manual) and ai.exists()
+    delete_changeover_media_files(77)  # deleting the project takes everything
+    assert not ai.exists()

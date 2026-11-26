@@ -314,8 +314,15 @@ async def approve_proposal(
         raise HTTPException(status_code=500, detail=APPROVAL_FAILURE_MESSAGE) from exc
 
 
-async def _session_response() -> AiSessionResponse:
+async def _session_response(db: AsyncSession) -> AiSessionResponse:
     state, version, updated_at = await ai_session_store.get()
+    # The pre-created transition project was deleted (or the draft is from before a reset):
+    # drop the link, and the AI / custom transition choice that needs it, so the page doesn't
+    # keep calling a project that is gone ("Project not found").
+    if state.transition_project_id is not None and not await db.get(ProjectDB, state.transition_project_id):
+        state, version, updated_at = await ai_session_store.put(
+            state.model_copy(update={"transition_project_id": None, "transition_mode": "default"})
+        )
     proposal = await proposal_store.get(state.proposal_id) if state.proposal_id else None
     active = await job_store.active()
     return AiSessionResponse(
@@ -328,22 +335,22 @@ async def _session_response() -> AiSessionResponse:
 
 
 @router.get("/session", response_model=AiSessionResponse)
-async def get_ai_session():
+async def get_ai_session(db: AsyncSession = Depends(get_db)):
     """The shared AI draft plus its proposal and any running build, for whichever device asks."""
-    return await _session_response()
+    return await _session_response(db)
 
 
 @router.put("/session", response_model=AiSessionResponse)
-async def put_ai_session(payload: AiSessionState):
+async def put_ai_session(payload: AiSessionState, db: AsyncSession = Depends(get_db)):
     """Replace the shared AI draft (the last device to write wins)."""
     await ai_session_store.put(payload)
-    return await _session_response()
+    return await _session_response(db)
 
 
 @router.delete("/session", response_model=AiSessionResponse)
-async def clear_ai_session():
+async def clear_ai_session(db: AsyncSession = Depends(get_db)):
     await ai_session_store.reset()
-    return await _session_response()
+    return await _session_response(db)
 
 
 # Declared before /jobs/{job_id} so "active" isn't read as a job id.

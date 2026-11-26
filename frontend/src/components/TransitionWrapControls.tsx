@@ -80,6 +80,19 @@ export default function TransitionWrapControls({ value, onChange }: Props) {
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => set({ drinkArt: "none" })}
+              className={clsx(
+                "h-16 w-24 border font-mono text-xs uppercase tracking-[0.12em]",
+                value.drinkArt === "none"
+                  ? "border-magenta/60 text-magenta-pale"
+                  : "border-phosphor/14 text-phosphor-text/60"
+              )}
+              title="No art: the call word lands on your clip's frozen last frame"
+            >
+              NO ART · HOLD FRAME
+            </button>
+            <button
+              type="button"
               onClick={() => set({ drinkArt: "" })}
               className={clsx(
                 "h-16 w-24 border font-mono text-xs uppercase tracking-[0.12em]",
@@ -108,7 +121,8 @@ export default function TransitionWrapControls({ value, onChange }: Props) {
         </div>
       )}
       <p className="type-body">
-        The countdown ticks over the last 3 seconds of your clip; the ending adds about 2 seconds.
+        The countdown ticks over the last 3 seconds of your clip; the ending adds about 2 seconds
+        {value.drinkEnding && value.drinkArt === "none" ? " (your last frame held under the call word)" : ""}.
       </p>
     </div>
   );

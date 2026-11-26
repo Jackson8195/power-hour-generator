@@ -10,11 +10,15 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-async def analyze_audio(file_path: str, clip_duration: int = 60, segment_count: int = 1) -> dict:
+async def analyze_audio(
+    file_path: str, clip_duration: int = 60, segment_count: int = 1, music_likeness: float | None = None
+) -> dict:
     """Analyze audio and produce recommendations for clip review.
 
     ``segment_count`` > 1 additionally asks for that many non-overlapping clip ranges
     (used by the AI flow to cut several clips from one compilation video).
+    ``music_likeness`` overrides the measured value (0.0 = score as speech/talk only, used
+    by AI video transitions so a moment lands on a line rather than crowd noise).
 
     Returns:
         dict with keys:
@@ -28,7 +32,7 @@ async def analyze_audio(file_path: str, clip_duration: int = 60, segment_count: 
             - segments: list[dict], up to ``segment_count`` non-overlapping ranges, best first
     """
     # Run CPU-intensive analysis in a thread pool
-    return await asyncio.to_thread(_analyze_sync, file_path, clip_duration, segment_count)
+    return await asyncio.to_thread(_analyze_sync, file_path, clip_duration, segment_count, music_likeness)
 
 
 # Sources longer than this skip the second full-length beat_track pass for BPM.
@@ -65,7 +69,9 @@ def _load_audio(file_path: str, sr: int = ANALYSIS_SAMPLE_RATE) -> tuple[np.ndar
     return np.frombuffer(proc.stdout, dtype=np.float32).copy(), sr
 
 
-def _analyze_sync(file_path: str, clip_duration: int = 60, segment_count: int = 1) -> dict:
+def _analyze_sync(
+    file_path: str, clip_duration: int = 60, segment_count: int = 1, music_likeness: float | None = None
+) -> dict:
     """Synchronous audio analysis (runs in thread pool)."""
     import librosa
 
@@ -87,7 +93,7 @@ def _analyze_sync(file_path: str, clip_duration: int = 60, segment_count: int = 
                 "segments": [full],
             }
 
-        features = _segment_features(y, sr, clip_duration)
+        features = _segment_features(y, sr, clip_duration, music_likeness)
         music_likeness = features.music_likeness
         rhythmic = music_likeness >= 0.5
         # Long talk/compilation sources have many good moments: offer a few more to the reviewer.
@@ -163,7 +169,9 @@ class _SegmentFeatures:
         return self.music_likeness >= 0.5
 
 
-def _segment_features(y: np.ndarray, sr: int, clip_duration: int) -> _SegmentFeatures:
+def _segment_features(
+    y: np.ndarray, sr: int, clip_duration: int, likeness_override: float | None = None
+) -> _SegmentFeatures:
     """Compute everything the window rankers need, once per source.
 
     Songs are scored on loudness + onset activity and snapped to the beat. Speech, sketches,
@@ -178,6 +186,8 @@ def _segment_features(y: np.ndarray, sr: int, clip_duration: int) -> _SegmentFea
     hop_length = 512
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_length)
     music_likeness = _music_likeness(onset_env, sr, hop_length)
+    if likeness_override is not None:
+        music_likeness = float(min(1.0, max(0.0, likeness_override)))
     party = _compute_party_score(y, sr, hop_length, onset_env)
     activity = _compute_activity_score(y, sr, hop_length, onset_env)
     n = min(len(party), len(activity))

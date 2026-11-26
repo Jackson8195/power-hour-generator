@@ -521,3 +521,93 @@ def test_queue_step_falls_back_to_default_card_when_none_ready(client, project_i
     state = client.portal.call(run)
     assert calls == ["ai", "default"]
     assert state.current_step == "Creating transition clips"
+
+
+# ─── relevance: ranking, broader searches, AI review ─────
+
+def test_youtube_candidates_rank_relevant_titles_before_short_ones():
+    results = [
+        _result("short_off", "Katy Perry LOSES it", "0:20"),
+        _result("long_on", "Simon Cowell harshest comments American Idol", "6:00"),
+        _result("short_on", "Simon Cowell harsh comments to auditioners", "0:40"),
+    ]
+    picked = ait.choose_youtube_candidates(results, set(), [], query="Simon Cowell harsh comments American Idol")
+    assert [r.youtube_id for r in picked] == ["long_on", "short_on", "short_off"]
+
+
+def test_over_specific_searches_get_broader_fallbacks():
+    query = "American Idol season 7 Simon Cowell definite no audition blunt rejection spoken"
+    assert ait.broaden_query(query) == "American Idol Simon Cowell"
+    spec = ait.TransitionSpec(kind="youtube", label="Simon says no", query=query, fallback_query="Simon Cowell insults")
+    assert ait.search_plan(spec) == [query, "Simon Cowell insults", "American Idol Simon Cowell"]
+
+
+def test_off_topic_results_are_reviewed_out_and_a_broader_search_is_tried(monkeypatch):
+    import asyncio
+
+    searched, reviewed, built = [], [], []
+
+    async def fake_search(query, max_results=10, music=False):
+        searched.append(query)
+        if query == "Simon Cowell insults":
+            return [_result("agt", "Simon Cowell Mel B fight America's Got Talent"),
+                    _result("idol", "Simon Cowell insults American Idol auditions")]
+        return []  # the over-specific first search finds nothing
+
+    async def fake_review(spec, results):
+        reviewed.append([r.youtube_id for r in results])
+        return [r for r in results if "Got Talent" not in r.title]
+
+    async def fake_try(spec, project_id, index, output_path, resolution, candidate, errors):
+        built.append(candidate.youtube_id)
+        return candidate.youtube_id, 5.8
+
+    monkeypatch.setattr(ait, "search_youtube", fake_search)
+    monkeypatch.setattr(ait, "review_transition_results", fake_review)
+    monkeypatch.setattr(ait, "_try_candidate", fake_try)
+    spec = ait.TransitionSpec(kind="youtube", label="Simon says no",
+                              query="American Idol season 7 Simon Cowell blunt rejection",
+                              fallback_query="Simon Cowell insults")
+    youtube_id, _ = asyncio.run(ait._build_youtube(spec, 1, 0, "out.mp4", "320x180", set(), []))
+    assert youtube_id == "idol" and built == ["idol"]
+    assert searched[:2] == [spec.query, "Simon Cowell insults"]
+
+
+def test_transition_review_fails_open(monkeypatch):
+    import asyncio
+
+    from app.services import auto_generate as ag
+
+    def broken_client():
+        raise RuntimeError("no key")
+
+    monkeypatch.setattr(ag, "_get_openai_client", broken_client)
+    results = [_result("a", "Simon Cowell insults")]
+    spec = ait.TransitionSpec(kind="youtube", label="x", query="Simon Cowell insults")
+    assert asyncio.run(ait.review_transition_results(spec, results)) == results
+
+
+def test_transition_review_drops_rejected_results(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.services import auto_generate as ag
+
+    class FakeAI:
+        def __init__(self):
+            self.sent = []
+            self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+        async def create(self, **kwargs):
+            self.sent.append(kwargs["messages"][1]["content"])
+            message = SimpleNamespace(content='{"reject": [1]}')
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    ai = FakeAI()
+    monkeypatch.setattr(ag, "_get_openai_client", lambda: ai)
+    results = [_result("agt", "Simon Cowell on Got Talent"), _result("idol", "Simon Cowell Idol insults")]
+    spec = ait.TransitionSpec(kind="youtube", label="Simon says no", query="Simon Cowell insults",
+                              context="Power hour: American Idol golden era | Transitions: Simon insults")
+    kept = asyncio.run(ait.review_transition_results(spec, results))
+    assert [r.youtube_id for r in kept] == ["idol"]
+    assert "American Idol golden era" in ai.sent[0] and "Simon insults" in ai.sent[0]

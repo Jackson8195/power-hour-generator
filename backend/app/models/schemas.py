@@ -187,6 +187,8 @@ class RenderRequest(BaseModel):
     resolution: str = "1280x720"
     transition_type: str = "crossfade"
     include_countdown: bool = True
+    # Song position ("12 / 60") in the top-right corner of every song.
+    include_counter: bool = True
     # After a successful render, trim every clip still on its full source to its saved range
     # and delete the sources (the AI build's review flow). Off: sources are left as they are.
     finalize_sources: bool = False

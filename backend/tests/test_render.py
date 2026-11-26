@@ -177,3 +177,36 @@ def test_finished_tapes_download_as_an_attachment(client, project_id, db, media_
 def test_health_reports_the_lan_address_for_share_links(client):
     body = client.get("/api/health").json()
     assert "lan_host" in body and "frontend_port" in body
+
+
+def test_songs_are_numbered_and_skip_the_countdown_before_a_transition():
+    from app.services.ffmpeg import mark_song_positions
+
+    clips = [{"title": "a"}, {"is_changeover": True}, {"title": "b"}, {"title": "c"}]
+    mark_song_positions(clips)
+    songs = [c for c in clips if not c.get("is_changeover")]
+    assert [(c["song_number"], c["song_total"]) for c in songs] == [(1, 3), (2, 3), (3, 3)]
+    assert [c["followed_by_changeover"] for c in songs] == [True, False, False]
+    assert "song_number" not in clips[1]  # transitions are never counted
+
+
+def test_song_counter_overlay_renders_with_real_ffmpeg(tmp_path):
+    import shutil
+    import subprocess
+
+    import pytest
+
+    from app.services.ffmpeg import song_counter_filter
+    from app.services.transition_fx import _find_font
+
+    if not shutil.which("ffmpeg") or not _find_font():
+        pytest.skip("ffmpeg or a bold font not installed")
+    shutil.copyfile(_find_font(), tmp_path / "font.ttf")  # bare name: no drive colon in the graph
+    out = tmp_path / "counter.mp4"
+    result = subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=320x180:d=1",
+         "-vf", song_counter_filter(12, 60, 180, fontfile="font.ttf"), str(out)],
+        capture_output=True, text=True, cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    assert out.stat().st_size > 0

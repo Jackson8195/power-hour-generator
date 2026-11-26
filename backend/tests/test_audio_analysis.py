@@ -132,6 +132,14 @@ def test_analysis_reports_music_likeness_and_valid_range():
     assert result["segments"][0]["start"] == result["suggested_start"]
 
 
+def test_music_likeness_can_be_forced_for_talk_moments():
+    """AI video transitions score as speech: the override replaces the measured likeness."""
+    y = np.tile(_click_track(30), 4)  # clearly rhythmic on its own
+    assert aa._segment_features(y, SR, 4).rhythmic
+    forced = aa._segment_features(y, SR, 4, likeness_override=0.0)
+    assert forced.music_likeness == 0.0 and not forced.rhythmic
+
+
 def test_mp4_downloads_load_even_when_librosa_cannot_read_them(tmp_path):
     """librosa 1.0 can't open MP4/M4A; analysis must still get the audio (via ffmpeg)."""
     import shutil

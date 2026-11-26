@@ -402,15 +402,16 @@ async def build_animated_card(
 
 def video_filter(
     width: int, height: int, clip_seconds: float, fg: str, has_audio: bool, sound: str,
-    show_text: bool = True, recorded: bool = False,
+    show_text: bool = True, recorded: bool = False, countdown: bool = True,
 ) -> str:
     """filter_complex for a found clip followed by the freeze-frame beat: the call word over
-    the darkened last frame, or (``show_text`` off) just the held frame and the cue."""
+    the darkened last frame, or (``show_text`` off) just the held frame and the cue.
+    ``countdown`` off drops the corner 3-2-1 (the hand-built "hold last frame" ending)."""
     hit_at = clip_seconds
     total = clip_seconds + VIDEO_TAIL_SECONDS
     margin = max(8, int(height * 0.03))
     cw, ch = width + 2 * margin, height + 2 * margin
-    countdown_at = max(0.0, clip_seconds - COUNTDOWN_SECONDS)
+    countdown_at = max(0.0, clip_seconds - COUNTDOWN_SECONDS) if countdown else None
     after_hit = f"gte(t,{_f(hit_at)})"
 
     video = ",".join([
@@ -426,7 +427,7 @@ def video_filter(
         ] if show_text else []),
         # No text: no shake either (a hit "after the end" never fires).
         _shake_crop(width, height, margin, hit_at if show_text else total + 10, None),
-        *_corner_countdown(countdown_at, width, height, fg),
+        *(_corner_countdown(countdown_at, width, height, fg) if countdown_at is not None else []),
         "format=yuv420p[v]",
     ])
     if has_audio:
@@ -686,15 +687,21 @@ async def build_clip_with_stinger(
     art_path: str | None = None,
     hit_text: str = "DRINK!",
     sound: str = DEFAULT_SOUND,
+    hold_frame: bool = False,
 ) -> float:
     """A clip with the corner countdown over its end, then (when ``art_path``) the drink-art
-    stinger with the call word and cue. ``clip_seconds=None`` uses the rest of the file.
-    Returns the length of the result."""
+    stinger with the call word and cue, or (``hold_frame``) no art at all: the call word and
+    cue over the clip's own held last frame, like an AI video transition.
+    ``clip_seconds=None`` uses the rest of the file. Returns the length of the result."""
     width, height = _size(resolution)
     source = str(Path(video_path).resolve())
     if clip_seconds is None:
         clip_seconds = max(0.5, (await probe_duration(source)) - max(0.0, start))
     clip_seconds = round(clip_seconds, 2)
+    if hold_frame:
+        return await _clip_with_held_frame(
+            output_path, source, start, clip_seconds, width, height, text_color, countdown, hit_text, sound
+        )
     sound = usable_sound(sound)
     recorded = sound_file(sound) if art_path else None
     has_audio = await _has_audio_stream(source)
@@ -724,6 +731,36 @@ async def build_clip_with_stinger(
         ]
         await _run_ffmpeg(cmd, tmp, "clip transition")
     return round(total, 2)
+
+
+async def _clip_with_held_frame(
+    output_path: str, source: str, start: float, clip_seconds: float, width: int, height: int,
+    text_color: str, countdown: bool, hit_text: str, sound: str,
+) -> float:
+    """The video-only ending: the clip, then the call word + cue over its frozen last frame."""
+    sound = usable_sound(sound)
+    recorded = sound_file(sound)
+    has_audio = await _has_audio_stream(source)
+    output = Path(output_path).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    total = round(clip_seconds + VIDEO_TAIL_SECONDS, 2)
+    show_text = bool((hit_text or "").strip())
+    with tempfile.TemporaryDirectory(prefix="ph_holdframe_") as tmp:
+        _write_texts(Path(tmp), {"hit.txt": hit_text.strip() if show_text else " ", **_countdown_texts()})
+        cmd = [
+            settings.ffmpeg_path, "-y", "-hide_banner",
+            "-ss", _f(max(0.0, start)), "-t", _f(clip_seconds), "-i", source,
+            *(["-i", str(recorded.resolve())] if recorded else []),
+            "-filter_complex",
+            video_filter(
+                width, height, clip_seconds, _hex(text_color), has_audio, sound,
+                show_text, bool(recorded), countdown,
+            ),
+            "-map", "[v]", "-map", "[a]", "-t", _f(total),
+            *_ENCODE, str(output),
+        ]
+        await _run_ffmpeg(cmd, tmp, "clip transition (held frame)")
+    return total
 
 
 async def cut_window(source: str, output_path: str, start: float, seconds: float) -> float:

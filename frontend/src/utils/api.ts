@@ -466,14 +466,14 @@ export async function healthCheck(): Promise<{
 export interface TransitionWrap {
   countdown: boolean; // corner 3·2·1 over the end of the clip
   drinkEnding: string; // "" = none, else a cue sound name ("can", "clink", ...)
-  drinkArt: string; // bundled art file name ("" = pick one)
+  drinkArt: string; // "none" = no art, hold the clip's last frame; "" = pick one; else a bundled art file
   drinkWord: string; // "DRINK!", "SHOT!", ...
 }
 
 export const DEFAULT_TRANSITION_WRAP: TransitionWrap = {
   countdown: true,
   drinkEnding: "",
-  drinkArt: "",
+  drinkArt: "none",
   drinkWord: "DRINK!",
 };
 

@@ -92,3 +92,13 @@ def test_clear_resets_the_draft(client):
     client.put("/api/auto-generate/session", json={"prompt": "something"})
     body = client.delete("/api/auto-generate/session").json()
     assert body["session"]["prompt"] == ""
+
+
+def test_a_deleted_transition_project_is_dropped_from_the_draft(client):
+    resp = client.put("/api/auto-generate/session", json={
+        "prompt": "idol", "transition_mode": "ai", "transition_project_id": 987654,
+    })
+    body = resp.json()
+    assert body["session"]["transition_project_id"] is None
+    assert body["session"]["transition_mode"] == "default"
+    assert client.get("/api/auto-generate/session").json()["session"]["prompt"] == "idol"

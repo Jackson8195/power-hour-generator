@@ -80,15 +80,22 @@ def _to_response(row: ChangoverClipDB) -> ChangoverClipResponse:
     )
 
 
+# drink_art value for the video-only ending: no art card, the call word lands on the clip's
+# own held last frame (like an AI video transition).
+HOLD_FRAME_ART = "none"
+
+
 def _wrap_options(countdown: object, drink_ending: object, drink_art: object, drink_word: object) -> dict:
     """Validate the builder's wrap options against fixed lists (nothing free-form reaches ffmpeg)."""
     sound = str(drink_ending or "").strip().lower()
     art_names = {p.name: p for p in bundled_art()}
     word = str(drink_word or "").strip().upper()
+    art_choice = str(drink_art or "")
     return {
         "countdown": str(countdown).strip().lower() not in ("false", "0", "no", "off"),
         "sound": sound if sound in available_sounds() else "",
-        "art": art_names.get(str(drink_art or "")),
+        "hold_frame": art_choice == HOLD_FRAME_ART,
+        "art": art_names.get(art_choice),
         "word": word if word in HIT_WORDS else "DRINK!",
     }
 
@@ -99,7 +106,8 @@ async def _apply_wrap(output_path: str, options: dict, project_id: int) -> float
     if not options["countdown"] and not options["sound"]:
         return None
     art = None
-    if options["sound"]:
+    hold_frame = bool(options["sound"]) and options.get("hold_frame", False)
+    if options["sound"] and not hold_frame:
         art = options["art"] or pick_bundled_art(project_id)
     wrapped = str(Path(output_path).with_name(Path(output_path).stem + "_wrapped.mp4"))
     length = await build_clip_with_stinger(
@@ -112,6 +120,7 @@ async def _apply_wrap(output_path: str, options: dict, project_id: int) -> float
         art_path=str(art) if art else None,
         hit_text=options["word"],
         sound=options["sound"] or DEFAULT_SOUND,
+        hold_frame=hold_frame,
     )
     Path(wrapped).replace(output_path)
     return length
@@ -135,18 +144,27 @@ async def transition_art(name: str):
     raise HTTPException(status_code=404, detail="Unknown art")
 
 
-def delete_changeover_media_files(project_id: int) -> None:
-    """Delete all changeover media files for a project. Also used by project deletion."""
-    changeover_dir = settings.changeover_dir
-    for pattern in [
-        f"project_{project_id}_image.*",
-        f"project_{project_id}_audio.*",
-        f"project_{project_id}_raw.*",
-        f"project_{project_id}_changeover.mp4",
-        f"project_{project_id}_ai_*",
-    ]:
-        for f in changeover_dir.glob(pattern):
+_MANUAL_PATTERNS = (
+    "project_{id}_image.*",
+    "project_{id}_audio.*",
+    "project_{id}_raw.*",
+    "project_{id}_changeover.mp4",
+)
+
+
+def delete_manual_changeover_files(project_id: int) -> None:
+    """Delete only the hand-built transition's files. Replacing or deleting it must never
+    touch the project's AI transitions (``project_{id}_ai_*``)."""
+    for pattern in _MANUAL_PATTERNS:
+        for f in settings.changeover_dir.glob(pattern.format(id=project_id)):
             f.unlink(missing_ok=True)
+
+
+def delete_changeover_media_files(project_id: int) -> None:
+    """Delete all changeover media files for a project, AI ones included (project deletion)."""
+    delete_manual_changeover_files(project_id)
+    for f in settings.changeover_dir.glob(f"project_{project_id}_ai_*"):
+        f.unlink(missing_ok=True)
 
 
 # ─── GET /api/changeover/{project_id} ────────────────────
@@ -194,7 +212,7 @@ async def build_image_audio_changeover(
             raise HTTPException(status_code=422, detail=f"Audio type {aud_ext!r} not allowed")
 
     # Clean up old files
-    delete_changeover_media_files(project_id)
+    delete_manual_changeover_files(project_id)
 
     # Save uploads
     image_path = ""
@@ -286,7 +304,7 @@ async def start_youtube_changeover(
     if not youtube_id:
         raise HTTPException(status_code=422, detail="youtube_id is required")
 
-    delete_changeover_media_files(project_id)
+    delete_manual_changeover_files(project_id)
 
     result = await db.execute(
         select(ChangoverClipDB).where(
@@ -368,7 +386,7 @@ async def start_youtube_audio_changeover(
     if not youtube_id:
         raise HTTPException(status_code=422, detail="youtube_id is required")
 
-    delete_changeover_media_files(project_id)
+    delete_manual_changeover_files(project_id)
 
     result = await db.execute(
         select(ChangoverClipDB).where(
@@ -449,7 +467,7 @@ async def upload_video_changeover(
     if vid_ext not in _ALLOWED_VIDEO_EXTS:
         raise HTTPException(status_code=422, detail=f"Video type {vid_ext!r} not allowed")
 
-    delete_changeover_media_files(project_id)
+    delete_manual_changeover_files(project_id)
 
     raw_path = str(settings.changeover_dir / f"project_{project_id}_raw{vid_ext}")
     with open(raw_path, "wb") as f:
@@ -636,7 +654,7 @@ async def delete_changeover_clip(project_id: int, db: AsyncSession = Depends(get
     if not row:
         raise HTTPException(status_code=404, detail="No changeover clip for this project")
 
-    delete_changeover_media_files(project_id)
+    delete_manual_changeover_files(project_id)
     await db.delete(row)
     await db.commit()
     return {"status": "deleted"}

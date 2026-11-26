@@ -153,6 +153,7 @@ async def _run_render(
                 resolution=request.resolution,
                 transition_type=request.transition_type,
                 include_countdown=request.include_countdown,
+                include_counter=request.include_counter,
                 progress_callback=progress_callback,
                 on_encoder_selected=on_encoder_selected,
             )

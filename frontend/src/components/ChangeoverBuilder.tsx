@@ -20,6 +20,20 @@ import {
 import TransitionWrapControls from "./TransitionWrapControls";
 import { useConfirm } from "./ConfirmDialog";
 
+// Busts the cache across reloads; the per-mount counter below handles changes within a visit.
+const PAGE_LOAD = Date.now().toString(36);
+
+/** The manual transition reuses the same file names for every download/build, so the browser
+ *  would keep playing a cached old video (wrong length, broken seeking). Version the URL by
+ *  what changed so a new source or rebuild is always fetched fresh. */
+function freshMedia(url: string, clip: ChangoverClip, nonce: number) {
+  if (!url) return url;
+  const version = [PAGE_LOAD, nonce, clip.source_type, clip.youtube_id, clip.trim_start, clip.trim_end, clip.duration]
+    .map((part) => String(part ?? ""))
+    .join("-");
+  return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}`;
+}
+
 interface ChangeoverBuilderProps {
   projectId: number;
   /** Fired whenever the changeover clip changes (built, downloaded, deleted). */
@@ -34,6 +48,13 @@ interface ChangeoverBuilderProps {
 export default function ChangeoverBuilder({ projectId, onClipChange }: ChangeoverBuilderProps) {
   const confirm = useConfirm();
   const [changoverClip, setChangoverClip] = useState<ChangoverClip | null>(null);
+  // Bumped on every status change (downloading -> downloaded, building -> ready, ...), so a
+  // re-download or re-upload under the same file name is fetched again.
+  const [mediaNonce, setMediaNonce] = useState(0);
+  const clipStatus = changoverClip?.status;
+  useEffect(() => {
+    setMediaNonce((n) => n + 1);
+  }, [clipStatus]);
   const [showChangoverBuilder, setShowChangoverBuilder] = useState(false);
   const [changoverMode, setChangoverMode] = useState<"image_audio" | "youtube" | "local_video">("image_audio");
   // image+audio mode
@@ -292,7 +313,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
       {!showChangoverBuilder && changoverClip?.status === "ready" && changoverClip.preview_url && (
         <div className="mt-4">
           <video playsInline
-            src={changoverClip.preview_url}
+            src={freshMedia(changoverClip.preview_url, changoverClip, mediaNonce)}
             controls
             className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black"
           />
@@ -318,7 +339,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
         <div className="mt-4 space-y-3">
           {changoverClip.raw_video_url && (
             <video playsInline
-              src={changoverClip.raw_video_url}
+              src={freshMedia(changoverClip.raw_video_url, changoverClip, mediaNonce)}
               controls
               className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black"
             />
@@ -601,7 +622,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
               {changoverClip?.status === "downloaded" && changoverClip.source_type === "youtube" && (
                 <div className="space-y-3">
                   {changoverClip.raw_video_url && (
-                    <video playsInline src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
+                    <video playsInline src={freshMedia(changoverClip.raw_video_url, changoverClip, mediaNonce)} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
                   )}
                   <div className="flex flex-wrap items-center gap-4">
                     <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
@@ -665,7 +686,7 @@ export default function ChangeoverBuilder({ projectId, onClipChange }: Changeove
               {changoverClip?.status === "downloaded" && changoverClip.source_type === "local_video" && (
                 <div className="space-y-3">
                   {changoverClip.raw_video_url && (
-                    <video playsInline src={changoverClip.raw_video_url} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
+                    <video playsInline src={freshMedia(changoverClip.raw_video_url, changoverClip, mediaNonce)} controls className="w-full max-w-sm rounded-bezel border border-phosphor/12 bg-black" />
                   )}
                   <div className="flex flex-wrap items-center gap-4">
                     <label className="flex items-center gap-2 font-mono text-sm uppercase tracking-[0.14em] text-phosphor-text/75">
